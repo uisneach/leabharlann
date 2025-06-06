@@ -1,9 +1,7 @@
-# An Leabharlann Írusáin
+# An Leabharlann Ghaelach
 
 ## About
-Welcome to **An Leabharlann Írusáin**, a comprehensive library of Celtic, Gaelic, and Brytthonic source texts. Currently that consists of a long markdown file filled with links to various places around the internet where these resources are stored. The name of this library is an homage to [@turbarius](https://x.com/turbarius) on Twitter, whose indefatigable and precise citations inspired in many of us a dedication to primary sources (and because the name sounds nice).
-
-The scope of this project will be to collect links and references to all known works of Celtic history, and also to collect significant works written *by* the Celtic peoples on any topic.
+Welcome to **An Leabharlann Ghealach**, a comprehensive library of Celtic, Gaelic, and Brytthonic source texts. Currently that consists of a long markdown file filled with links to various places around the internet where these resources are stored. The scope of this project will be to collect links and references to all known works of Celtic history, and also to collect significant works written *by* the Celtic peoples on any topic.
 
 New links will appear over time, and this project may take an entirely new structure as we progress. Help is wanted in documenting our national histories.
 
@@ -68,6 +66,7 @@ If you have a link or a text you'd like to contribute, either contact [@ogmios](
 [EuroDocs - Ireland from 1169 to 1691](https://eudocs.lib.byu.edu/index.php/Ireland_1169_to_1691)
 
 [Irish Texts Society](https://irishtextssociety.org/)
+
 
 ## Known Authors
 
