@@ -35,6 +35,8 @@ If you have a link or a text you'd like to contribute, either contact [@ogmios](
 - 1868, [The Pious Miscellany, and Other Poems](https://archive.org/details/piousmiscellanyo00suoft/page/n3/mode/2up?view=theater) by Tadhg Gaelach Ó Súilleabháin
 
 ### 20th Century
+- 1900, An Claidheamh Soluis, [Eanáir-Meitheamh](https://issuu.com/cnag/docs/1900a), [Iúil-Nollaig](https://issuu.com/cnag/docs/1900b).
+- 1901, An Claidheamh Soluis, [Eanáir-Meitheamh](https://issuu.com/cnag/docs/1901a), [Iúil-Nollaig](https://issuu.com/cnag/docs/1901b).
 - 1906, [The Silver Age of the Greek World](https://archive.org/details/silverageofgreek0000maha/page/n5/mode/2up) by John Pentland Mahaffy
 - 1916, [Proclamation of the Irish Republic](https://en.wikisource.org/wiki/Proclamation_of_the_Irish_Republic) by the Irish Republican Brotherhood.
 
