@@ -174,6 +174,7 @@ If you have a link or a text you'd like to contribute, either contact [@ogmios](
 - [Donald Alexander Mackenzie](https://en.wikipedia.org/wiki/Donald_Alexander_Mackenzie)
 - [William Ogilvie of Pittensear](https://en.wikipedia.org/wiki/William_Ogilvie_of_Pittensear)
 - [Henry Kyd Douglas](https://en.wikipedia.org/wiki/Henry_Kyd_Douglas)
+- [Eòghann MacLachlainn](https://en.m.wikipedia.org/wiki/Ewen_MacLachlan)
 
 ### Manx
 
