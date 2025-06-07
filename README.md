@@ -67,6 +67,8 @@ If you have a link or a text you'd like to contribute, either contact [@ogmios](
 
 [Irish Texts Society](https://irishtextssociety.org/)
 
+[UCC Text Archive](https://www.ucc.ie/en/smg/cdi/textarchive)
+
 
 ## Known Authors
 
