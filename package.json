@@ -1,0 +1,17 @@
+{
+  "name": "anleabharlannghealach",
+  "version": "1.0.0",
+  "description": "## About Welcome to **An Leabharlann Ghealach**, a comprehensive library of Celtic, Gaelic, and Brytthonic source texts. Currently that consists of a long markdown file filled with links to various places around the internet where these resources are stored. The scope of this project will be to collect links and references to all known works of Celtic history, and also to collect significant works written *by* the Celtic peoples on any topic.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "neo4j-driver": "^5.28.1"
+  }
+}
