@@ -3,9 +3,12 @@ require('dotenv').config();
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const neo4j = require('neo4j-driver');
+const cors = require('cors');
+const app  = express();
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 // --- Neo4j Driver ---
 const driver = neo4j.driver(

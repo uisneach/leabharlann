@@ -44,7 +44,7 @@ If you have a link or a text you'd like to contribute, either contact [@ogmios](
 
 <details>
   <summary>Unsorted</summary>
-
+  
 - [Lebar na Núachongbála](https://www.maryjones.us/ctexts/leinster.html)
 - [The Book of Leinster](https://www.maryjones.us/ctexts/leinster.html)
 - [Lebor na nUidre](https://www.maryjones.us/ctexts/lu.html)
