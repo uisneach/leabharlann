@@ -50,55 +50,70 @@ app.post('/login', (req, res) => {
 app.get('/', async (req, res, next) => {
   const session = driver.session();
   try {
-    // Pull up to 10 nodes, plus any outgoing relationships and their targets
     const result = await session.run(`
-      MATCH (n)
-      OPTIONAL MATCH (n)-[r]->(m)
-      WITH collect(DISTINCT n)       AS nodes,
-           collect(DISTINCT r)       AS rels,
-           collect(DISTINCT m)       AS targets
-      RETURN nodes, rels, targets
-      LIMIT 1
+      MATCH (a)-[r]->(b)
+      RETURN
+        id(r)      AS relId,
+        type(r)    AS relType,
+
+        // Source node summary
+        id(a)               AS srcId,
+        labels(a)[0]        AS srcLabel,
+        a.name      AS srcName,
+        a.title     AS srcTitle,
+
+        // Target node summary
+        id(b)               AS tgtId,
+        labels(b)[0]        AS tgtLabel,
+        b.name      AS tgtName,
+        b.title     AS tgtTitle
+
+      LIMIT 25
     `);
 
-    if (result.records.length === 0) {
-      return res.json({ nodes: [], relationships: [] });
-    }
-
-    const record = result.records[0];
-    const nodes = record.get('nodes').map(node => ({
-      id: node.identity.toString(),
-      labels: node.labels,
-      ...node.properties
-    }));
-    const targets = record.get('targets').map(node => ({
-      id: node.identity.toString(),
-      labels: node.labels,
-      ...node.properties
-    }));
-    // Combine original nodes + any targets not already in nodes
-    const allNodes = [...nodes];
-    for (const t of targets) {
-      if (!allNodes.some(n => n.id === t.id)) {
-        allNodes.push(t);
+    // Map relationships with embedded node info
+    const relationships = result.records.map(rec => ({
+      id:    rec.get('relId').toString(),
+      type:  rec.get('relType'),
+      source: {
+        id:    rec.get('srcId').toString(),
+        label: rec.get('srcLabel'),
+        // pick whichever property exists
+        name:  rec.get('srcName')  || rec.get('srcTitle')
+      },
+      target: {
+        id:    rec.get('tgtId').toString(),
+        label: rec.get('tgtLabel'),
+        name:  rec.get('tgtName')  || rec.get('tgtTitle')
       }
-    }
-
-    const relationships = record.get('rels').map(rel => ({
-      id: rel.identity.toString(),
-      type: rel.type,
-      source: rel.start.toString(),
-      target: rel.end.toString(),
-      ...rel.properties
     }));
 
-    res.json({ nodes: allNodes, relationships });
+    // Build a unique nodes list from those relationships
+    const nodeMap = {};
+    relationships.forEach(r => {
+      nodeMap[r.source.id] = {
+        id:    r.source.id,
+        labels:[r.source.label],
+        ...(r.source.name ? { name: r.source.name } : {})
+      };
+      nodeMap[r.target.id] = {
+        id:    r.target.id,
+        labels:[r.target.label],
+        ...(r.target.name ? { name: r.target.name } : {})
+      };
+    });
+
+    res.json({
+      nodes: Object.values(nodeMap),
+      relationships
+    });
   } catch (err) {
     next(err);
   } finally {
     await session.close();
   }
 });
+
 
 // --- Helper to CREATE a node with label and props ---
 async function createNode(label, props) {
