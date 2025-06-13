@@ -46,13 +46,53 @@ app.post('/login', (req, res) => {
   res.status(401).json({ error: 'Invalid credentials' });
 });
 
-// --- Public: List up to 10 nodes ---
+// --- Public: List up to 10 nodes + relationships ---
 app.get('/', async (req, res, next) => {
   const session = driver.session();
   try {
-    const result = await session.run('MATCH (n) RETURN n LIMIT 10');
-    const nodes = result.records.map(r => r.get('n').properties);
-    res.json(nodes);
+    // Pull up to 10 nodes, plus any outgoing relationships and their targets
+    const result = await session.run(`
+      MATCH (n)
+      OPTIONAL MATCH (n)-[r]->(m)
+      WITH collect(DISTINCT n)       AS nodes,
+           collect(DISTINCT r)       AS rels,
+           collect(DISTINCT m)       AS targets
+      RETURN nodes, rels, targets
+      LIMIT 1
+    `);
+
+    if (result.records.length === 0) {
+      return res.json({ nodes: [], relationships: [] });
+    }
+
+    const record = result.records[0];
+    const nodes = record.get('nodes').map(node => ({
+      id: node.identity.toString(),
+      labels: node.labels,
+      ...node.properties
+    }));
+    const targets = record.get('targets').map(node => ({
+      id: node.identity.toString(),
+      labels: node.labels,
+      ...node.properties
+    }));
+    // Combine original nodes + any targets not already in nodes
+    const allNodes = [...nodes];
+    for (const t of targets) {
+      if (!allNodes.some(n => n.id === t.id)) {
+        allNodes.push(t);
+      }
+    }
+
+    const relationships = record.get('rels').map(rel => ({
+      id: rel.identity.toString(),
+      type: rel.type,
+      source: rel.start.toString(),
+      target: rel.end.toString(),
+      ...rel.properties
+    }));
+
+    res.json({ nodes: allNodes, relationships });
   } catch (err) {
     next(err);
   } finally {
