@@ -55,34 +55,59 @@
         const data = await res.json();
 
         // Title
-        const label = data.labels[0] || type;
-        const title = data.properties.name || data.properties.title || value;
-        document.getElementById('node-label')
-          .textContent = `${label}: ${title}`;
+        const label = data.labels?.[0] ?? type;
+        const title = data.properties?.name 
+          ?? data.properties?.title 
+          ?? value 
+          ?? '(no title)';
+        document.getElementById('node-label').textContent = `${label}: ${title}`;
 
         // Properties
         const propList = document.getElementById('properties-list');
         propList.innerHTML = '';
-        Object.entries(data.properties).forEach(([key, val]) => {
+        if (data.properties) {
+          Object.entries(data.properties).forEach(([key, val]) => {
+            const li = document.createElement('li');
+            let display;
+            if (Array.isArray(val)) {
+              display = val.length ? val.join(', ') : '(empty array)';
+            } else if (val == null) {
+              display = '(none)';
+            } else {
+              display = val;
+            }
+            li.textContent = `${key}: ${display}`;
+            propList.appendChild(li);
+          });
+        } else {
           const li = document.createElement('li');
-          const display = Array.isArray(val) ? val.join(', ') : val;
-          li.textContent = `${key}: ${display}`;
+          li.textContent = '(no properties)';
           propList.appendChild(li);
-        });
+        }
 
         // Relations
         const relList = document.getElementById('relations-list');
         relList.innerHTML = '';
-        data.relations.forEach(rel => {
+        if (Array.isArray(data.relations) && data.relations.length) {
+          data.relations.forEach(rel => {
+            const typeStr   = rel?.type ?? '(unknown relation)';
+            const tgtLabel  = rel?.target?.label ?? '(unknown)';
+            const tgtName   = rel?.target?.name ?? rel?.target?.title ?? '(unnamed)';
+            const tgtType   = tgtLabel.toLowerCase?.() ?? 'node';
+            const tgtValue  = encodeURIComponent(tgtName);
+            const a         = document.createElement('a');
+            a.href          = `info.html?type=${tgtType}&value=${tgtValue}`;
+            a.textContent   = `${typeStr} → ${tgtLabel}: ${tgtName}`;
+
+            const li = document.createElement('li');
+            li.appendChild(a);
+            relList.appendChild(li);
+          });
+        } else {
           const li = document.createElement('li');
-          const a = document.createElement('a');
-          const tgtType = rel.target.label.toLowerCase();
-          const tgtValue = encodeURIComponent(rel.target.name || rel.target.title);
-          a.href = `info.html?type=${tgtType}&value=${tgtValue}`;
-          a.textContent = `${rel.type} → ${rel.target.label}: ${rel.target.name || rel.target.title}`;
-          li.appendChild(a);
+          li.textContent = '(no relations)';
           relList.appendChild(li);
-        });
+        }
 
       } catch (err) {
         document.body.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;

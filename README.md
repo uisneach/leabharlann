@@ -1,7 +1,7 @@
 # An Leabharlann Ghaelach
 
 ## About
-Welcome to **An Leabharlann Ghealach**, a comprehensive library of Celtic, Gaelic, and Brytthonic source texts. Currently that consists of a long markdown file filled with links to various places around the internet where these resources are stored. The scope of this project will be to collect links and references to all known works of Celtic history, and also to collect significant works written *by* the Celtic peoples on any topic.
+Welcome to **An Leabharlann Ghealach**, a comprehensive library of Celtic, Gaelic, and Brytthonic source texts. Currently this project consists of a long markdown file filled with links to various places around the internet where these source texts are stored. The scope of this project will be to collect references to all known works of Celtic history, and also to collect significant works written *by* the Celtic peoples on any topic.
 
 New links will appear over time, and this project may take an entirely new structure as we progress. Help is wanted in documenting our national histories.
 
@@ -44,7 +44,7 @@ If you have a link or a text you'd like to contribute, either contact [@ogmios](
 
 <details>
   <summary>Unsorted</summary>
-  
+
 - [Lebar na Núachongbála](https://www.maryjones.us/ctexts/leinster.html)
 - [The Book of Leinster](https://www.maryjones.us/ctexts/leinster.html)
 - [Lebor na nUidre](https://www.maryjones.us/ctexts/lu.html)
