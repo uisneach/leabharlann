@@ -1,4 +1,3 @@
-// index.js
 require('dotenv').config();
 const express = require('express');
 const jwt = require('jsonwebtoken');
@@ -152,6 +151,57 @@ app.get('/node/:id', async (req, res, next) => {
       labels:    record.get('labels'),
       properties: record.get('props'),
       relations: record.get('relations').map(r => ({
+        id:     r.id.toString(),
+        type:   r.type,
+        target: {
+          id:    r.target.id.toString(),
+          label: r.target.label,
+          name:  r.target.name
+        }
+      }))
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+app.get('/authors/:name', async (req, res, next) => {
+  const authorName = req.params.name;
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (a:Author {name: $authorName})
+      OPTIONAL MATCH (a)-[r]->(m)
+      RETURN
+        id(a)             AS id,
+        labels(a)         AS labels,
+        properties(a)     AS props,
+        collect({
+          id:     id(r),
+          type:   type(r),
+          target: {
+            id:    id(m),
+            label: labels(m)[0],
+            name:  coalesce(m.name, m.title)
+          }
+        })                AS relations
+      `,
+      { authorName }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: `Author "${authorName}" not found` });
+    }
+
+    const record = result.records[0];
+    res.json({
+      id:         record.get('id').toString(),
+      labels:     record.get('labels'),
+      properties: record.get('props'),
+      relations:  record.get('relations').map(r => ({
         id:     r.id.toString(),
         type:   r.type,
         target: {

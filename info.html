@@ -41,7 +41,7 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/node/${id}`);
+        const res = await fetch(`${API_BASE}/authors/Homer`);
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         const data = await res.json();
 
