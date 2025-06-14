@@ -167,18 +167,19 @@ app.get('/node/:id', async (req, res, next) => {
   }
 });
 
+// ----- GET /authors/:name -----
 app.get('/authors/:name', async (req, res, next) => {
   const authorName = req.params.name;
   const session = driver.session();
   try {
     const result = await session.run(
       `
-      MATCH (a:Author {name: $authorName})
+      MATCH (a:Author {name: $val})
       OPTIONAL MATCH (a)-[r]->(m)
       RETURN
-        id(a)             AS id,
-        labels(a)         AS labels,
-        properties(a)     AS props,
+        id(a)         AS id,
+        labels(a)     AS labels,
+        properties(a) AS props,
         collect({
           id:     id(r),
           type:   type(r),
@@ -187,21 +188,19 @@ app.get('/authors/:name', async (req, res, next) => {
             label: labels(m)[0],
             name:  coalesce(m.name, m.title)
           }
-        })                AS relations
+        })            AS relations
       `,
-      { authorName }
+      { val: authorName }
     );
-
     if (result.records.length === 0) {
       return res.status(404).json({ error: `Author "${authorName}" not found` });
     }
-
-    const record = result.records[0];
+    const rec = result.records[0];
     res.json({
-      id:         record.get('id').toString(),
-      labels:     record.get('labels'),
-      properties: record.get('props'),
-      relations:  record.get('relations').map(r => ({
+      id:         rec.get('id').toString(),
+      labels:     rec.get('labels'),
+      properties: rec.get('props'),
+      relations:  rec.get('relations').map(r => ({
         id:     r.id.toString(),
         type:   r.type,
         target: {
@@ -217,6 +216,57 @@ app.get('/authors/:name', async (req, res, next) => {
     await session.close();
   }
 });
+
+// ----- GET /texts/:title -----
+app.get('/texts/:title', async (req, res, next) => {
+  const textTitle = req.params.title;
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (t:Text {title: $val})
+      OPTIONAL MATCH (t)-[r]->(m)
+      RETURN
+        id(t)         AS id,
+        labels(t)     AS labels,
+        properties(t) AS props,
+        collect({
+          id:     id(r),
+          type:   type(r),
+          target: {
+            id:    id(m),
+            label: labels(m)[0],
+            name:  coalesce(m.name, m.title)
+          }
+        })            AS relations
+      `,
+      { val: textTitle }
+    );
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: `Text "${textTitle}" not found` });
+    }
+    const rec = result.records[0];
+    res.json({
+      id:         rec.get('id').toString(),
+      labels:     rec.get('labels'),
+      properties: rec.get('props'),
+      relations:  rec.get('relations').map(r => ({
+        id:     r.id.toString(),
+        type:   r.type,
+        target: {
+          id:    r.target.id.toString(),
+          label: r.target.label,
+          name:  r.target.name
+        }
+      }))
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
 
 
 // --- Helper to CREATE a node with label and props ---

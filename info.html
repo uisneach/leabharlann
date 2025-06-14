@@ -15,44 +15,54 @@
 </head>
 <body>
   <h1 id="node-label">Loading...</h1>
-  <div id="properties">
+
+  <section id="properties">
     <h2>Properties</h2>
     <ul class="meta-list" id="properties-list"></ul>
-  </div>
-  <div id="relations">
+  </section>
+
+  <section id="relations">
     <h2>Relations</h2>
     <ul class="relations-list" id="relations-list"></ul>
-  </div>
+  </section>
 
   <script>
     const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
 
-    // Utility: get `id` from URL like ?id=123
-    function getNodeId() {
+    // Read ?type=author&value=Homer or ?type=text&value=Iliad
+    function getParams() {
       const params = new URLSearchParams(window.location.search);
-      return params.get('id');
+      return {
+        type:  params.get('type'),
+        value: params.get('value')
+      };
     }
 
     async function renderNode() {
-      const id = getNodeId();
-      if (!id) {
-        document.body.innerHTML = '<p style="color:red;">Missing node ID in URL.</p>';
+      const { type, value } = getParams();
+      if (!type || !value) {
+        document.body.innerHTML = 
+          '<p style="color:red;">Missing query parameters. Use ?type=author&value=NAME or ?type=text&value=TITLE</p>';
         return;
       }
 
+      // Build endpoint: /authors/:name or /texts/:title
+      const endpoint = `${API_BASE}/${type}s/${encodeURIComponent(value)}`;
+
       try {
-        const res = await fetch(`${API_BASE}/authors/Homer`);
+        const res = await fetch(endpoint);
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         const data = await res.json();
 
         // Title
-        const label = data.labels[0] || 'Node';
-        const title = data.properties.name || data.properties.title || '';
-        document.getElementById('node-label').textContent = `${label}: ${title}`;
+        const label = data.labels[0] || type;
+        const title = data.properties.name || data.properties.title || value;
+        document.getElementById('node-label')
+          .textContent = `${label}: ${title}`;
 
         // Properties
         const propList = document.getElementById('properties-list');
-        propList.innerHTML = ''; // clear
+        propList.innerHTML = '';
         Object.entries(data.properties).forEach(([key, val]) => {
           const li = document.createElement('li');
           const display = Array.isArray(val) ? val.join(', ') : val;
@@ -66,8 +76,10 @@
         data.relations.forEach(rel => {
           const li = document.createElement('li');
           const a = document.createElement('a');
-          a.href = `node.html?id=${rel.target.id}`; // assumes this file is node.html
-          a.textContent = `${rel.type} → ${rel.target.label}: ${rel.target.name}`;
+          const tgtType = rel.target.label.toLowerCase();
+          const tgtValue = encodeURIComponent(rel.target.name || rel.target.title);
+          a.href = `node.html?type=${tgtType}&value=${tgtValue}`;
+          a.textContent = `${rel.type} → ${rel.target.label}: ${rel.target.name || rel.target.title}`;
           li.appendChild(a);
           relList.appendChild(li);
         });
