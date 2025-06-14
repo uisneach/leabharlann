@@ -22,4 +22,4 @@ jobs:
           branch: gh-pages             # Target branch
           folder: public               # Folder to deploy (e.g. your build output)
           clean: true                  # Remove existing files from gh-pages
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.DEPLOY_TOKEN }}
