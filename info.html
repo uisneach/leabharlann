@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Node Info</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    h1 { margin-bottom: 0.5rem; }
+    .meta-list, .relations-list { list-style: none; padding: 0; }
+    .meta-list li, .relations-list li { margin: 0.5rem 0; }
+    .relations-list li a { text-decoration: none; color: blue; }
+    .relations-list li a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1 id="node-label">Loading...</h1>
+  <div id="properties">
+    <h2>Properties</h2>
+    <ul class="meta-list" id="properties-list"></ul>
+  </div>
+  <div id="relations">
+    <h2>Relations</h2>
+    <ul class="relations-list" id="relations-list"></ul>
+  </div>
+
+  <script>
+    const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
+
+    // Utility: get `id` from URL like ?id=123
+    function getNodeId() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('id');
+    }
+
+    async function renderNode() {
+      const id = getNodeId();
+      if (!id) {
+        document.body.innerHTML = '<p style="color:red;">Missing node ID in URL.</p>';
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/node/${id}`);
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        const data = await res.json();
+
+        // Title
+        const label = data.labels[0] || 'Node';
+        const title = data.properties.name || data.properties.title || '';
+        document.getElementById('node-label').textContent = `${label}: ${title}`;
+
+        // Properties
+        const propList = document.getElementById('properties-list');
+        propList.innerHTML = ''; // clear
+        Object.entries(data.properties).forEach(([key, val]) => {
+          const li = document.createElement('li');
+          const display = Array.isArray(val) ? val.join(', ') : val;
+          li.textContent = `${key}: ${display}`;
+          propList.appendChild(li);
+        });
+
+        // Relations
+        const relList = document.getElementById('relations-list');
+        relList.innerHTML = '';
+        data.relations.forEach(rel => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = `node.html?id=${rel.target.id}`; // assumes this file is node.html
+          a.textContent = `${rel.type} → ${rel.target.label}: ${rel.target.name}`;
+          li.appendChild(a);
+          relList.appendChild(li);
+        });
+
+      } catch (err) {
+        document.body.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', renderNode);
+  </script>
+</body>
+</html>

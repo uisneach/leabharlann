@@ -114,6 +114,60 @@ app.get('/', async (req, res, next) => {
   }
 });
 
+// index.js (add below your other routes)
+
+app.get('/node/:id', async (req, res, next) => {
+  const nodeId = parseInt(req.params.id, 10);
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (n)
+      WHERE id(n) = $nodeId
+      OPTIONAL MATCH (n)-[r]->(m)
+      RETURN
+        id(n)            AS id,
+        labels(n)        AS labels,
+        properties(n)    AS props,
+        collect({
+          id:     id(r),
+          type:   type(r),
+          target: {
+            id:    id(m),
+            label: labels(m)[0],
+            name:  coalesce(m.name, m.title)
+          }
+        })               AS relations
+      `,
+      { nodeId }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Node not found' });
+    }
+
+    const record = result.records[0];
+    res.json({
+      id:        record.get('id').toString(),
+      labels:    record.get('labels'),
+      properties: record.get('props'),
+      relations: record.get('relations').map(r => ({
+        id:     r.id.toString(),
+        type:   r.type,
+        target: {
+          id:    r.target.id.toString(),
+          label: r.target.label,
+          name:  r.target.name
+        }
+      }))
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
 
 // --- Helper to CREATE a node with label and props ---
 async function createNode(label, props) {
