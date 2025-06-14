@@ -78,7 +78,7 @@
           const a = document.createElement('a');
           const tgtType = rel.target.label.toLowerCase();
           const tgtValue = encodeURIComponent(rel.target.name || rel.target.title);
-          a.href = `node.html?type=${tgtType}&value=${tgtValue}`;
+          a.href = `info.html?type=${tgtType}&value=${tgtValue}`;
           a.textContent = `${rel.type} → ${rel.target.label}: ${rel.target.name || rel.target.title}`;
           li.appendChild(a);
           relList.appendChild(li);

@@ -72,16 +72,16 @@ app.get('/', async (req, res, next) => {
 
     // Map relationships with embedded node info
     const relationships = result.records.map(rec => ({
-      id:    rec.get('relId').toString(),
+      id:    rec.get('relId')?.toString(),
       type:  rec.get('relType'),
       source: {
-        id:    rec.get('srcId').toString(),
+        id:    rec.get('srcId')?.toString(),
         label: rec.get('srcLabel'),
         // pick whichever property exists
         name:  rec.get('srcName')  || rec.get('srcTitle')
       },
       target: {
-        id:    rec.get('tgtId').toString(),
+        id:    rec.get('tgtId')?.toString(),
         label: rec.get('tgtLabel'),
         name:  rec.get('tgtName')  || rec.get('tgtTitle')
       }
@@ -147,14 +147,14 @@ app.get('/node/:id', async (req, res, next) => {
 
     const record = result.records[0];
     res.json({
-      id:        record.get('id').toString(),
+      id:        record.get('id')?.toString(),
       labels:    record.get('labels'),
       properties: record.get('props'),
       relations: record.get('relations').map(r => ({
-        id:     r.id.toString(),
+        id:     r.id?.toString(),
         type:   r.type,
         target: {
-          id:    r.target.id.toString(),
+          id:    r.target.id?.toString(),
           label: r.target.label,
           name:  r.target.name
         }
@@ -197,14 +197,14 @@ app.get('/authors/:name', async (req, res, next) => {
     }
     const rec = result.records[0];
     res.json({
-      id:         rec.get('id').toString(),
+      id:         rec.get('id')?.toString(),
       labels:     rec.get('labels'),
       properties: rec.get('props'),
       relations:  rec.get('relations').map(r => ({
-        id:     r.id.toString(),
+        id:     r.id?.toString(),
         type:   r.type,
         target: {
-          id:    r.target.id.toString(),
+          id:    r.target.id?.toString(),
           label: r.target.label,
           name:  r.target.name
         }
@@ -247,14 +247,14 @@ app.get('/texts/:title', async (req, res, next) => {
     }
     const rec = result.records[0];
     res.json({
-      id:         rec.get('id').toString(),
+      id:         rec.get('id')?.toString(),
       labels:     rec.get('labels'),
       properties: rec.get('props'),
       relations:  rec.get('relations').map(r => ({
-        id:     r.id.toString(),
+        id:     r.id?.toString(),
         type:   r.type,
         target: {
-          id:    r.target.id.toString(),
+          id:    r.target.id?.toString(),
           label: r.target.label,
           name:  r.target.name
         }
