@@ -292,6 +292,7 @@ app.post('/cypher', requireAuth, async (req, res, next) => {
       });
       return obj;
     });
+    console.log("Result: " + result);
     res.json({
       columns: result.records[0]?.keys || [],
       data
