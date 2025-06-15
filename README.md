@@ -42,6 +42,11 @@ If you have a link or a text you'd like to contribute, either contact [@ogmios](
 - 1906, [The Silver Age of the Greek World](https://archive.org/details/silverageofgreek0000maha/page/n5/mode/2up) by John Pentland Mahaffy
 - 1916, [Proclamation of the Irish Republic](https://en.wikisource.org/wiki/Proclamation_of_the_Irish_Republic) by the Irish Republican Brotherhood.
 
+### Secondary Research
+- 1987, [Gaulish. Language, Writing, Epigraphy](https://latinnow.eu/wp-content/uploads/2018/11/gaulish-open-access.pdf) by Alex Mullen and Coline Darasse.
+- 1991, [The Celtic Museum](https://whitefiles.org/his/celtic_museum/index.htm) by Micheal Newton.
+- [Gagnon's Gaulish Reference](http://www.gaulish.umop.net/).
+
 <details>
   <summary>Unsorted</summary>
 

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Run Cypher</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    textarea { width: 100%; height: 200px; font-family: monospace; }
+    button { padding: 0.5rem 1rem; }
+    pre { background: #f0f0f0; padding: 1rem; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Execute Cypher Query</h1>
+  <form id="cypher-form">
+    <textarea id="query" placeholder="Enter Cypher here…">MATCH (n) RETURN n LIMIT 5</textarea>
+    <br><br>
+    <button type="submit">Run</button>
+  </form>
+  <h2>Result</h2>
+  <pre id="result">Waiting for query…</pre>
+
+  <script>
+    const API_BASE = 'https://an-leabharlann-ghealach.onrender.com'; 
+    const TOKEN = localStorage.getItem('token'); // or wherever you store your JWT
+
+    document.getElementById('cypher-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const query = document.getElementById('query').value.trim();
+      if (!query) return alert('Please enter a Cypher query');
+
+      try {
+        const res = await fetch(`${API_BASE}/cypher`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${TOKEN}`
+          },
+          body: JSON.stringify({ query })
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          document.getElementById('result').textContent = 
+            `Error ${res.status}: ${json.error || JSON.stringify(json)}`;
+        } else {
+          document.getElementById('result').textContent = 
+            JSON.stringify(json, null, 2);
+        }
+      } catch (err) {
+        document.getElementById('result').textContent = `Request failed: ${err.message}`;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -267,7 +267,40 @@ app.get('/texts/:title', async (req, res, next) => {
   }
 });
 
+// POST /cypher
+app.post('/cypher', requireAuth, async (req, res, next) => {
+  const { query } = req.body;
+  if (!query || typeof query !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid "query" in request body' });
+  }
 
+  const session = driver.session();
+  try {
+    const result = await session.run(query);
+    // Convert each record into a plain object
+    const data = result.records.map(record => {
+      const obj = {};
+      record.keys.forEach((key, idx) => {
+        const value = record.get(key);
+        // If it's a Node or Relationship, pull out .properties
+        if (value && typeof value === 'object' && value.properties) {
+          obj[key] = value.properties;
+        } else {
+          obj[key] = value;
+        }
+      });
+      return obj;
+    });
+    res.json({
+      columns: result.records[0]?.keys || [],
+      data
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
 
 // --- Helper to CREATE a node with label and props ---
 async function createNode(label, props) {
