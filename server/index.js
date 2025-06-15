@@ -273,6 +273,7 @@ app.post('/cypher', requireAuth, async (req, res, next) => {
   if (!query || typeof query !== 'string') {
     return res.status(400).json({ error: 'Missing or invalid "query" in request body' });
   }
+  console.log("Attempting to run the following query: " + query);
 
   const session = driver.session();
   try {
