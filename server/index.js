@@ -113,8 +113,6 @@ app.get('/', async (req, res, next) => {
   }
 });
 
-// index.js (add below your other routes)
-
 app.get('/node/:id', async (req, res, next) => {
   const nodeId = parseInt(req.params.id, 10);
   const session = driver.session();
@@ -167,7 +165,9 @@ app.get('/node/:id', async (req, res, next) => {
   }
 });
 
-// ----- GET /authors/:name -----
+
+// This endpoint allows the user to search for an author by name.
+// RETURNS: Info about the author, and all relationships connected to that author.
 app.get('/authors/:name', async (req, res, next) => {
   const authorName = req.params.name;
   const session = driver.session();
@@ -176,39 +176,59 @@ app.get('/authors/:name', async (req, res, next) => {
       `
       MATCH (a:Author {name: $val})
       OPTIONAL MATCH (a)-[r]->(m)
+      OPTIONAL MATCH (n)-[r2]->(a)
       RETURN
-        id(a)         AS id,
-        labels(a)     AS labels,
-        properties(a) AS props,
-        collect({
-          id:     id(r),
-          type:   type(r),
-          target: {
+        id(a)            AS id,
+        labels(a)        AS labels,
+        properties(a)    AS props,
+
+        collect(DISTINCT {
+          relId:    id(r),
+          type:     type(r),
+          direction:"outgoing",
+          node: {
             id:    id(m),
             label: labels(m)[0],
             name:  coalesce(m.name, m.title)
           }
-        })            AS relations
+        })               AS outgoing,
+
+        collect(DISTINCT {
+          relId:    id(r2),
+          type:     type(r2),
+          direction:"incoming",
+          node: {
+            id:    id(n),
+            label: labels(n)[0],
+            name:  coalesce(n.name, n.title)
+          }
+        })               AS incoming
       `,
       { val: authorName }
     );
+
     if (result.records.length === 0) {
       return res.status(404).json({ error: `Author "${authorName}" not found` });
     }
+
     const rec = result.records[0];
+    const makeRel = r => ({
+      id:        r.relId?.toString(),
+      type:      r.type,
+      direction: r.direction,
+      node: {
+        id:    r.node.id?.toString(),
+        label: r.node.label,
+        name:  r.node.name
+      }
+    });
+
     res.json({
-      id:         rec.get('id')?.toString(),
-      labels:     rec.get('labels'),
-      properties: rec.get('props'),
-      relations:  rec.get('relations').map(r => ({
-        id:     r.id?.toString(),
-        type:   r.type,
-        target: {
-          id:    r.target.id?.toString(),
-          label: r.target.label,
-          name:  r.target.name
-        }
-      }))
+      id:             rec.get('id')?.toString(),
+      labels:         rec.get('labels'),
+      properties:     rec.get('props'),
+      outgoingRels:   rec.get('outgoing').map(makeRel),
+      incomingRels:   rec.get('incoming').map(makeRel)
     });
   } catch (err) {
     next(err);
@@ -217,7 +237,8 @@ app.get('/authors/:name', async (req, res, next) => {
   }
 });
 
-// ----- GET /texts/:title -----
+// This endpoint will allow the user to search for a text by its title.
+// RETURNS: Info about the text, and all relationships connected to that text.
 app.get('/texts/:title', async (req, res, next) => {
   const textTitle = req.params.title;
   const session = driver.session();
@@ -226,39 +247,59 @@ app.get('/texts/:title', async (req, res, next) => {
       `
       MATCH (t:Text {title: $val})
       OPTIONAL MATCH (t)-[r]->(m)
+      OPTIONAL MATCH (n)-[r2]->(t)
       RETURN
-        id(t)         AS id,
-        labels(t)     AS labels,
-        properties(t) AS props,
-        collect({
-          id:     id(r),
-          type:   type(r),
-          target: {
+        id(t)            AS id,
+        labels(t)        AS labels,
+        properties(t)    AS props,
+
+        collect(DISTINCT {
+          relId:     id(r),
+          type:      type(r),
+          direction: "outgoing",
+          node: {
             id:    id(m),
             label: labels(m)[0],
             name:  coalesce(m.name, m.title)
           }
-        })            AS relations
+        })                AS outgoing,
+
+        collect(DISTINCT {
+          relId:     id(r2),
+          type:      type(r2),
+          direction: "incoming",
+          node: {
+            id:    id(n),
+            label: labels(n)[0],
+            name:  coalesce(n.name, n.title)
+          }
+        })                AS incoming
       `,
       { val: textTitle }
     );
+
     if (result.records.length === 0) {
       return res.status(404).json({ error: `Text "${textTitle}" not found` });
     }
+
     const rec = result.records[0];
+    const makeRel = r => ({
+      id:        r.relId?.toString(),
+      type:      r.type,
+      direction: r.direction,
+      node: {
+        id:    r.node.id?.toString(),
+        label: r.node.label,
+        name:  r.node.name
+      }
+    });
+
     res.json({
-      id:         rec.get('id')?.toString(),
-      labels:     rec.get('labels'),
-      properties: rec.get('props'),
-      relations:  rec.get('relations').map(r => ({
-        id:     r.id?.toString(),
-        type:   r.type,
-        target: {
-          id:    r.target.id?.toString(),
-          label: r.target.label,
-          name:  r.target.name
-        }
-      }))
+      id:             rec.get('id')?.toString(),
+      labels:         rec.get('labels'),
+      properties:     rec.get('props'),
+      outgoingRels:   rec.get('outgoing').map(makeRel),
+      incomingRels:   rec.get('incoming').map(makeRel)
     });
   } catch (err) {
     next(err);
@@ -267,7 +308,6 @@ app.get('/texts/:title', async (req, res, next) => {
   }
 });
 
-// POST /cypher
 app.post('/cypher', requireAuth, async (req, res, next) => {
   const { query } = req.body;
   if (!query || typeof query !== 'string') {
@@ -304,7 +344,6 @@ app.post('/cypher', requireAuth, async (req, res, next) => {
   }
 });
 
-// --- Helper to CREATE a node with label and props ---
 async function createNode(label, props) {
   const session = driver.session();
   const keys = Object.keys(props);
