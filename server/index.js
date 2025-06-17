@@ -308,6 +308,77 @@ app.get('/texts/:title', async (req, res, next) => {
   }
 });
 
+// GET /editions/:name
+app.get('/editions/:name', async (req, res, next) => {
+  const editionName = req.params.name;
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (e:Edition {name: $val})
+      OPTIONAL MATCH (e)-[r]->(m)
+      OPTIONAL MATCH (n)-[r2]->(e)
+      RETURN
+        id(e)            AS id,
+        labels(e)        AS labels,
+        properties(e)    AS props,
+
+        collect(DISTINCT {
+          relId:     id(r),
+          type:      type(r),
+          direction: "outgoing",
+          node: {
+            id:    id(m),
+            label: labels(m)[0],
+            name:  coalesce(m.name, m.title)
+          }
+        })               AS outgoing,
+
+        collect(DISTINCT {
+          relId:     id(r2),
+          type:      type(r2),
+          direction: "incoming",
+          node: {
+            id:    id(n),
+            label: labels(n)[0],
+            name:  coalesce(n.name, n.title)
+          }
+        })               AS incoming
+      `,
+      { val: editionName }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: `Edition "${editionName}" not found` });
+    }
+
+    const rec = result.records[0];
+    const makeRel = r => ({
+      id:        r.relId?.toString(),
+      type:      r.type,
+      direction: r.direction,
+      node: {
+        id:    r.node.id?.toString(),
+        label: r.node.label,
+        name:  r.node.name
+      }
+    });
+
+    res.json({
+      id:             rec.get('id')?.toString(),
+      labels:         rec.get('labels'),
+      properties:     rec.get('props'),
+      outgoingRels:   rec.get('outgoing').map(makeRel),
+      incomingRels:   rec.get('incoming').map(makeRel)
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+
 app.post('/cypher', requireAuth, async (req, res, next) => {
   const { query } = req.body;
   if (!query || typeof query !== 'string') {
