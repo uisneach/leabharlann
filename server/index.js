@@ -4,7 +4,6 @@ const jwt = require('jsonwebtoken');
 const neo4j = require('neo4j-driver');
 const cors = require('cors');
 
-
 const app  = express();
 app.use(express.json());
 app.use(cors());
@@ -33,6 +32,11 @@ function requireAuth(req, res, next) {
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+}
+
+// Helper to validate Neo4j identifiers (labels & rel types)
+function validIdentifier(str) {
+  return typeof str === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(str);
 }
 
 // --- Login Route ---
@@ -445,28 +449,82 @@ NODES.forEach(label => {
 });
 
 // --- Protected: Generic relationship creator ---
-// Body: { fromLabel, fromId, toLabel, toId, relType, relProps? }
+// Body: {
+//   fromLabel,        // e.g. "Author"
+//   fromId,           // the node.id property to match
+//   toLabel,          // e.g. "Text"
+//   toId,             // the node.id property to match
+//   relType,          // e.g. "WROTE"
+//   relProps?         // optional map of relationship properties
+// }
 app.post('/relation', requireAuth, async (req, res, next) => {
-  const { fromLabel, fromId, toLabel, toId, relType, relProps = {} } = req.body;
+  let { fromLabel, fromId, toLabel, toId, relType, relProps = {} } = req.body;
+
+  // Basic validation
+  if (![fromLabel, toLabel, relType].every(validIdentifier)) {
+    return res.status(400).json({ error: 'Invalid label or relationship type' });
+  }
+  if (![fromId, toId].every(v => typeof v === 'string' && v.length > 0)) {
+    return res.status(400).json({ error: 'fromId and toId must be non-empty strings' });
+  }
+  if (typeof relProps !== 'object') {
+    return res.status(400).json({ error: '`relProps` must be an object if provided' });
+  }
+
   const session = driver.session();
   try {
+    // Create / merge the relationship
     const result = await session.run(
       `
       MATCH (a:${fromLabel} {id:$fromId})
       MATCH (b:${toLabel}   {id:$toId})
       MERGE (a)-[r:${relType}]->(b)
       SET r += $relProps
-      RETURN r
+      RETURN 
+        id(r)              AS relInternalId,
+        type(r)            AS relType,
+        properties(r)      AS relProps,
+
+        id(a)              AS srcId,
+        labels(a)          AS srcLabels,
+        properties(a)      AS srcProps,
+
+        id(b)              AS tgtId,
+        labels(b)          AS tgtLabels,
+        properties(b)      AS tgtProps
       `,
       { fromId, toId, relProps }
     );
-    await session.close();
+
     if (result.records.length === 0) {
-      return res.status(404).json({ error: 'Nodes not found or relation failed' });
+      return res.status(404).json({ error: 'Source or target node not found' });
     }
-    res.status(201).json(result.records[0].get('r').properties);
+
+    const rec = result.records[0];
+    // Build a structured response
+    const response = {
+      relationship: {
+        id:         rec.get('relInternalId').toString(),
+        type:       rec.get('relType'),
+        properties: rec.get('relProps')
+      },
+      source: {
+        id:         rec.get('srcId').toString(),
+        labels:     rec.get('srcLabels'),
+        properties: rec.get('srcProps')
+      },
+      target: {
+        id:         rec.get('tgtId').toString(),
+        labels:     rec.get('tgtLabels'),
+        properties: rec.get('tgtProps')
+      }
+    };
+
+    res.status(201).json(response);
   } catch (err) {
     next(err);
+  } finally {
+    await session.close();
   }
 });
 

@@ -47,7 +47,7 @@
     <select id="nodeType" class="form-select w-auto">
       <option value="authors">Author</option>
       <option value="texts">Text</option>
-      <option value="edition">Edition</option>
+      <option value="editions">Edition</option>
     </select>
     <input id="nodeValue" class="form-control w-25" placeholder="Enter name or title" value="Homer">
     <button class="btn btn-primary" onclick="fetchAndRender()">Go</button>
@@ -64,6 +64,8 @@
   </div>
 
   <script>
+    // Thanks to this blog post for pointing in the direction of D3 for Neo4j database visualization.
+    // https://www.515tech.com/post/visualize-neo4j-graphs-using-d3-html-canvas
     const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
     const token    = localStorage.getItem('token');
 
@@ -152,13 +154,38 @@
       ctx.translate(transform.x, transform.y);
       ctx.scale(transform.k, transform.k);
 
+      // nodes
+      nodes.forEach(d => {
+        const label = d.props.name||d.props.title||d.id;
+        ctx.font='12px sans-serif';
+        const w=ctx.measureText(label).width, h=12;
+        const r=Math.max(circleSize,w/2+8,h/2+8);
+        d._r = r;
+        ctx.beginPath();
+        ctx.arc(d.x,d.y,r,0,2*Math.PI);
+        ctx.fillStyle='#6df1a9'; ctx.fill();
+        ctx.strokeStyle='#333'; ctx.stroke();
+        ctx.fillStyle='#000';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(label,d.x,d.y);
+      });
+
       // links
       links.forEach(d => {
         const sx=d.source.x, sy=d.source.y, tx=d.target.x, ty=d.target.y;
-        const dx=tx-sx, dy=ty-sy, dist=Math.hypot(dx,dy);
+        let dx=tx-sx, dy=ty-sy, dist=Math.hypot(dx,dy);
+        console.log(d);
+        console.log("dist: " + dist);
         const ux=dx/dist, uy=dy/dist;
-        const startX=sx+ux*circleSize, startY=sy+uy*circleSize;
-        const endX=tx-ux*circleSize,   endY=ty-uy*circleSize;
+        // grab each node’s radius (fallback to circleSize)
+        const rSource = d.source._r ?? circleSize;
+        const rTarget = d.target._r ?? circleSize;
+        // move start/end out by each node’s radius
+        const startX = sx + ux * rSource,
+              startY = sy + uy * rSource;
+        const endX   = tx - ux * rTarget,
+              endY   = ty - uy * rTarget;
+
         // line
         ctx.beginPath();
         ctx.moveTo(startX,startY);
@@ -188,22 +215,6 @@
         ctx.textBaseline='middle';
         ctx.fillText(d.type||'',0,-8);
         ctx.restore();
-      });
-
-      // nodes
-      nodes.forEach(d => {
-        const label = d.props.name||d.props.title||d.id;
-        ctx.font='12px sans-serif';
-        const w=ctx.measureText(label).width, h=12;
-        const r=Math.max(circleSize,w/2+8,h/2+8);
-        d._r = r;
-        ctx.beginPath();
-        ctx.arc(d.x,d.y,r,0,2*Math.PI);
-        ctx.fillStyle='#6df1a9'; ctx.fill();
-        ctx.strokeStyle='#333'; ctx.stroke();
-        ctx.fillStyle='#000';
-        ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText(label,d.x,d.y);
       });
 
       ctx.restore();

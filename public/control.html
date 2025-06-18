@@ -148,7 +148,7 @@ ${JSON.stringify(d,null,2)}`:`Error ${res.status}: ${d.error}`;
 
     // Create relationship
     document.getElementById('create-rel-form').addEventListener('submit', async e=>{
-      e.preventDefault(); const f=document.getElementById;
+      e.preventDefault(); const f=document.getElementById.bind(document);
       const payload={ fromLabel:f('rel-from-type').value, fromId:f('rel-from-key').value, toLabel:f('rel-to-type').value, toId:f('rel-to-key').value, relType:f('rel-type').value };
       try{
         const res=await fetch(`${API}/relation`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify(payload)});
