@@ -169,71 +169,141 @@ app.get('/node/:id', async (req, res, next) => {
   }
 });
 
+// --- CREATE Author ---
+// POST /authors  
+// Body: { name: string, <any other initial properties> }
+app.post('/authors', requireAuth, async (req, res, next) => {
+  const { name, ...otherProps } = req.body;
+  if (typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: '`name` is required' });
+  }
+  const session = driver.session();
+  try {
+    // Check for duplicate
+    const dup = await session.run(
+      `MATCH (a:Author {name:$name}) RETURN a LIMIT 1`,
+      { name }
+    );
+    if (dup.records.length) {
+      return res.status(409).json({ error: `Author "${name}" already exists` });
+    }
+    // Create with generated UUID for id
+    const id = crypto.randomUUID();
+    const props = { id, name, ...otherProps };
+    const rec = await session.run(
+      `CREATE (a:Author $props) RETURN a`,
+      { props }
+    );
+    const node = rec.records[0].get('a').properties;
+    res.status(201).json({ id: node.id, labels: ['Author'], properties: node });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
 
-// This endpoint allows the user to search for an author by name.
-// RETURNS: Info about the author, and all relationships connected to that author.
+// --- READ Author + Relations ---
+// GET /authors/:name  
 app.get('/authors/:name', async (req, res, next) => {
-  const authorName = req.params.name;
+  const name = req.params.name;
   const session = driver.session();
   try {
     const result = await session.run(
       `
-      MATCH (a:Author {name: $val})
+      MATCH (a:Author {name:$name})
       OPTIONAL MATCH (a)-[r]->(m)
       OPTIONAL MATCH (n)-[r2]->(a)
       RETURN
-        id(a)            AS id,
-        labels(a)        AS labels,
-        properties(a)    AS props,
-
-        collect(DISTINCT {
-          relId:    id(r),
-          type:     type(r),
-          direction:"outgoing",
-          node: {
-            id:    id(m),
-            label: labels(m)[0],
-            name:  coalesce(m.name, m.title)
-          }
-        })               AS outgoing,
-
-        collect(DISTINCT {
-          relId:    id(r2),
-          type:     type(r2),
-          direction:"incoming",
-          node: {
-            id:    id(n),
-            label: labels(n)[0],
-            name:  coalesce(n.name, n.title)
-          }
-        })               AS incoming
+        id(a)         AS id,
+        labels(a)     AS labels,
+        properties(a) AS props,
+        collect(DISTINCT { dir: 'out', relId:id(r), type:type(r),
+                           node:{ id:id(m), label:labels(m)[0], name:coalesce(m.name,m.title) } }) AS outgoing,
+        collect(DISTINCT { dir: 'in',  relId:id(r2),type:type(r2),
+                           node:{ id:id(n), label:labels(n)[0], name:coalesce(n.name,n.title) } }) AS incoming
       `,
-      { val: authorName }
+      { name }
     );
-
-    if (result.records.length === 0) {
-      return res.status(404).json({ error: `Author "${authorName}" not found` });
+    if (!result.records.length) {
+      return res.status(404).json({ error: `Author "${name}" not found` });
     }
-
-    const rec = result.records[0];
-    const makeRel = r => ({
-      id:        r.relId?.toString(),
-      type:      r.type,
-      direction: r.direction,
-      node: {
-        id:    r.node.id?.toString(),
-        label: r.node.label,
-        name:  r.node.name
-      }
+    const r = result.records[0];
+    const mk = rec => ({
+      id:        rec.get('id').toString(),
+      labels:    rec.get('labels'),
+      properties: rec.get('props'),
+      outgoingRels:  r.get('outgoing').map(o => ({
+        id: o.relId.toString(), type:o.type, target:o.node
+      })),
+      incomingRels:  r.get('incoming').map(i => ({
+        id: i.relId.toString(), type:i.type, source:i.node
+      }))
     });
+    res.json(mk(r));
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
 
-    res.json({
-      id:             rec.get('id')?.toString(),
-      labels:         rec.get('labels'),
-      properties:     rec.get('props'),
-      outgoingRels:   rec.get('outgoing').map(makeRel),
-      incomingRels:   rec.get('incoming').map(makeRel)
-    });
+// --- 3) UPDATE Author Properties ---
+// PUT /authors/:name  
+// Body: { properties: { key1: val1, key2: val2, … } }
+app.put('/authors/:name', requireAuth, async (req, res, next) => {
+  const name = req.params.name;
+  const { properties } = req.body;
+  if (typeof properties !== 'object' || Array.isArray(properties)) {
+    return res.status(400).json({ error: '`properties` must be an object' });
+  }
+  const session = driver.session();
+  try {
+    // Build SET clauses dynamically—but guard keys
+    const safeKeys = Object.keys(properties).filter(validIdentifier);
+    if (!safeKeys.length) {
+      return res.status(400).json({ error: 'No valid properties to set' });
+    }
+    const assignments = safeKeys.map(k => `a.${k} = $props.${k}`).join(', ');
+    const result = await session.run(
+      `
+      MATCH (a:Author {name:$name})
+      SET ${assignments}
+      RETURN properties(a) AS props
+      `,
+      { name, props: properties }
+    );
+    if (!result.records.length) {
+      return res.status(404).json({ error: `Author "${name}" not found` });
+    }
+    res.json({ properties: result.records[0].get('props') });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- 4) DELETE Author ---
+// DELETE /authors/:name
+app.delete('/authors/:name', requireAuth, async (req, res, next) => {
+  const name = req.params.name;
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (a:Author {name:$name})
+      WITH a, count(a) AS cnt
+      DETACH DELETE a
+      RETURN cnt
+      `,
+      { name }
+    );
+    const deleted = result.records[0].get('cnt').toNumber();
+    if (!deleted) {
+      return res.status(404).json({ error: `Author "${name}" not found` });
+    }
+    res.json({ deleted: true });
   } catch (err) {
     next(err);
   } finally {
