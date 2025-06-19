@@ -168,8 +168,8 @@ app.get('/node/:id', async (req, res, next) => {
           type:   r.type,
           target: {
             id:    r.target.id?.toString(),
-            label: r.target.label,
-            name:  r.target.name
+            labels: r.target.labels,
+            properties:  r.target.properties
           }
         }))
       });
@@ -500,8 +500,8 @@ app.get('/texts/:title', async (req, res, next) => {
       direction: r.direction,
       node: {
         id:    r.node.id?.toString(),
-        label: r.node.label,
-        name:  r.node.name
+        labels: r.node.labels,
+        properties:  r.node.properties
       }
     });
 
@@ -570,8 +570,8 @@ app.get('/editions/:name', async (req, res, next) => {
       direction: r.direction,
       node: {
         id:    r.node.id?.toString(),
-        label: r.node.label,
-        name:  r.node.name
+        labels: r.node.labels,
+        properties:  r.node.properties
       }
     });
 

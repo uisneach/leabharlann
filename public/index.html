@@ -105,7 +105,7 @@
       // fetch
       const type  = document.getElementById('nodeType').value;
       const value = document.getElementById('nodeValue').value.trim();
-      const url   = `${API_BASE}/${type}/${encodeURIComponent(value)?relations=true}`;
+      const url   = `${API_BASE}/${type}/${encodeURIComponent(value)}`;
       const res   = await fetch(url, { headers:{ 'Authorization':`Bearer ${token}`}});
       if (!res.ok) return alert(`Error ${res.status}`);
       const data  = await res.json();
