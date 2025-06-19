@@ -177,23 +177,45 @@ app.post('/authors', requireAuth, async (req, res, next) => {
   if (typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: '`name` is required' });
   }
+
+  // In it Neo4j driver
   const session = driver.session();
+
+  // Send POST message to database
   try {
-    // Check for duplicate
+    // First, check for duplicate node
     const dup = await session.run(
       `MATCH (a:Author {name:$name}) RETURN a LIMIT 1`,
       { name }
     );
+    // If the node already exists, return 409 CONFLICT
     if (dup.records.length) {
       return res.status(409).json({ error: `Author "${name}" already exists` });
     }
-    // Create with generated UUID for id
-    const id = crypto.randomUUID();
+
+    // Create with generated UUID for id, and check that the ID doesn't already exist in the DB
+    let id, timeout = 100;
+    while (timeout > 0) {
+      id = crypto.randomUUID();
+      const idCheck = await session.run(
+        `MATCH (a:Author {id:$id}) RETURN a LIMIT 1`,
+        { id }
+      );
+      if (idCheck.records.length === 0) break;  // We found an unused id
+      console.warn(`UUID collision on ${id}, regenerating…`);
+      timeout--;
+    }
+
+    // Create properties
     const props = { id, name, ...otherProps };
+
+    // Send request to database to create node
     const rec = await session.run(
       `CREATE (a:Author $props) RETURN a`,
       { props }
     );
+
+    // Return new author node to client.
     const node = rec.records[0].get('a').properties;
     res.status(201).json({ id: node.id, labels: ['Author'], properties: node });
   } catch (err) {
@@ -207,40 +229,75 @@ app.post('/authors', requireAuth, async (req, res, next) => {
 // GET /authors/:name  
 app.get('/authors/:name', async (req, res, next) => {
   const name = req.params.name;
+
+  // Init Neo4j driver
   const session = driver.session();
+
+  // Send request to database
   try {
     const result = await session.run(
       `
-      MATCH (a:Author {name:$name})
+      MATCH (a:Author {name: $val})
       OPTIONAL MATCH (a)-[r]->(m)
       OPTIONAL MATCH (n)-[r2]->(a)
       RETURN
-        id(a)         AS id,
-        labels(a)     AS labels,
-        properties(a) AS props,
-        collect(DISTINCT { dir: 'out', relId:id(r), type:type(r),
-                           node:{ id:id(m), label:labels(m)[0], name:coalesce(m.name,m.title) } }) AS outgoing,
-        collect(DISTINCT { dir: 'in',  relId:id(r2),type:type(r2),
-                           node:{ id:id(n), label:labels(n)[0], name:coalesce(n.name,n.title) } }) AS incoming
+        id(a)            AS id,
+        labels(a)        AS labels,
+        properties(a)    AS props,
+
+        collect(DISTINCT {
+          relId:    id(r),
+          type:     type(r),
+          direction:"outgoing",
+          node: {
+            id:    id(m),
+            label: labels(m)[0],
+            name:  coalesce(m.name, m.title)
+          }
+        })               AS outgoing,
+
+        collect(DISTINCT {
+          relId:    id(r2),
+          type:     type(r2),
+          direction:"incoming",
+          node: {
+            id:    id(n),
+            label: labels(n)[0],
+            name:  coalesce(n.name, n.title)
+          }
+        })               AS incoming
       `,
-      { name }
+      { val: name }
     );
+
+    // If no content inside the result, then there is no such author
     if (!result.records.length) {
       return res.status(404).json({ error: `Author "${name}" not found` });
     }
-    const r = result.records[0];
-    const mk = rec => ({
-      id:        rec.get('id').toString(),
-      labels:    rec.get('labels'),
-      properties: rec.get('props'),
-      outgoingRels:  r.get('outgoing').map(o => ({
-        id: o.relId.toString(), type:o.type, target:o.node
-      })),
-      incomingRels:  r.get('incoming').map(i => ({
-        id: i.relId.toString(), type:i.type, source:i.node
-      }))
+
+    // Get first author
+    const rec = result.records[0];
+
+    // Create template for JSON data structure, to be filled later
+    const makeRel = r => ({
+      id:        r.relId?.toString(),
+      type:      r.type,
+      direction: r.direction,
+      node: {
+        id:    r.node.id?.toString(),
+        label: r.node.label,
+        name:  r.node.name
+      }
     });
-    res.json(mk(r));
+
+    // Create JSON from template using the first author data, and return to client.
+    res.json({
+      id:             rec.get('id')?.toString(),
+      labels:         rec.get('labels'),
+      properties:     rec.get('props'),
+      outgoingRels:   rec.get('outgoing').map(makeRel),
+      incomingRels:   rec.get('incoming').map(makeRel)
+    });
   } catch (err) {
     next(err);
   } finally {
@@ -254,12 +311,18 @@ app.get('/authors/:name', async (req, res, next) => {
 app.put('/authors/:name', requireAuth, async (req, res, next) => {
   const name = req.params.name;
   const { properties } = req.body;
+
+  // If 'properties' is wrong type, throw error.
   if (typeof properties !== 'object' || Array.isArray(properties)) {
     return res.status(400).json({ error: '`properties` must be an object' });
   }
+
+  // Init Neo4j driver
   const session = driver.session();
+
+  // Send SET command to database
   try {
-    // Build SET clauses dynamically—but guard keys
+    // Build SET clauses dynamically while guarding keys
     const safeKeys = Object.keys(properties).filter(validIdentifier);
     if (!safeKeys.length) {
       return res.status(400).json({ error: 'No valid properties to set' });
@@ -276,6 +339,8 @@ app.put('/authors/:name', requireAuth, async (req, res, next) => {
     if (!result.records.length) {
       return res.status(404).json({ error: `Author "${name}" not found` });
     }
+
+    // Return the current list of properties returned from databse.
     res.json({ properties: result.records[0].get('props') });
   } catch (err) {
     next(err);
@@ -288,7 +353,11 @@ app.put('/authors/:name', requireAuth, async (req, res, next) => {
 // DELETE /authors/:name
 app.delete('/authors/:name', requireAuth, async (req, res, next) => {
   const name = req.params.name;
+
+  // Init Neo4j driver
   const session = driver.session();
+
+  // Send DELETE command to database
   try {
     const result = await session.run(
       `
@@ -299,10 +368,13 @@ app.delete('/authors/:name', requireAuth, async (req, res, next) => {
       `,
       { name }
     );
+
     const deleted = result.records[0].get('cnt').toNumber();
     if (!deleted) {
       return res.status(404).json({ error: `Author "${name}" not found` });
     }
+
+    // Return true if one or more nodes were deleted
     res.json({ deleted: true });
   } catch (err) {
     next(err);
