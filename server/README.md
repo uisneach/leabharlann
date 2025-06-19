@@ -71,3 +71,7 @@ The structure of the data returned by the API upon a GET call to a node:
     }
   }]
 }
+
+## Roadmap / Todo
+
+### Planned Features

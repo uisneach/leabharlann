@@ -117,52 +117,105 @@ app.get('/', async (req, res, next) => {
   }
 });
 
+// --- GET node ---
+// Endpoint to get a node by id and all of its labels and properties.
 app.get('/node/:id', async (req, res, next) => {
   const nodeId = parseInt(req.params.id, 10);
+
+  // Check whether client wants relationship data or only node data.
+  const withRels = req.query.relations === 'true';
+
+  // Init Neo4j driver
   const session = driver.session();
   try {
-    const result = await session.run(
-      `
-      MATCH (n)
-      WHERE id(n) = $nodeId
-      OPTIONAL MATCH (n)-[r]->(m)
-      RETURN
-        id(n)            AS id,
-        labels(n)        AS labels,
-        properties(n)    AS props,
-        collect({
-          id:     id(r),
-          type:   type(r),
+    const result;
+
+    if (withRels) {
+      // Query node data and relationship data
+      result = await session.run(
+        `
+        MATCH (n)
+        WHERE id(n) = $nodeId
+        OPTIONAL MATCH (n)-[r]->(m)
+        RETURN
+          id(n)            AS id,
+          labels(n)        AS labels,
+          properties(n)    AS props,
+          collect({
+            id:     id(r),
+            type:   type(r),
+            target: {
+              id:    id(m),
+              labels: labels(m),
+              properties:  properties(m)
+            }
+          })               AS relations
+        `,
+        { nodeId }
+      );
+
+      if (result.records.length === 0) {
+        return res.status(404).json({ error: 'Node not found' });
+      }
+
+      const record = result.records[0];
+      res.json({
+        id:        record.get('id')?.toString(),
+        labels:    record.get('labels'),
+        properties: record.get('props'),
+        relations: record.get('relations').map(r => ({
+          id:     r.id?.toString(),
+          type:   r.type,
           target: {
-            id:    id(m),
-            label: labels(m)[0],
-            name:  coalesce(m.name, m.title)
+            id:    r.target.id?.toString(),
+            label: r.target.label,
+            name:  r.target.name
           }
-        })               AS relations
-      `,
-      { nodeId }
-    );
+        }))
+      });
+    } else {
+      // Query only node data
+      result = await session.run(
+        `
+        MATCH (n)
+        WHERE id(n) = $nodeId
+        OPTIONAL MATCH (n)-[r]->(m)
+        RETURN
+          id(n)            AS id,
+          labels(n)        AS labels,
+          properties(n)    AS props,
+        `,
+        { nodeId }
+      );
+
+      if (result.records.length === 0) {
+        return res.status(404).json({ error: 'Node not found' });
+      }
+
+      console.log("GET Node Success");
+
+      const record = result.records[0];
+      res.json({
+        id:        record.get('id')?.toString(),
+        labels:    record.get('labels'),
+        properties: record.get('props'),
+      });
+    }
 
     if (result.records.length === 0) {
       return res.status(404).json({ error: 'Node not found' });
     }
+
+    console.log("GET Node Success");
 
     const record = result.records[0];
     res.json({
       id:        record.get('id')?.toString(),
       labels:    record.get('labels'),
       properties: record.get('props'),
-      relations: record.get('relations').map(r => ({
-        id:     r.id?.toString(),
-        type:   r.type,
-        target: {
-          id:    r.target.id?.toString(),
-          label: r.target.label,
-          name:  r.target.name
-        }
-      }))
     });
   } catch (err) {
+    console.log("GET Node Error");
     next(err);
   } finally {
     await session.close();
@@ -215,10 +268,13 @@ app.post('/authors', requireAuth, async (req, res, next) => {
       { props }
     );
 
+    console.log("CREATE Author Success");
+
     // Return new author node to client.
     const node = rec.records[0].get('a').properties;
     res.status(201).json({ id: node.id, labels: ['Author'], properties: node });
   } catch (err) {
+    console.log("CREATE Author Error");
     next(err);
   } finally {
     await session.close();
@@ -290,6 +346,8 @@ app.get('/authors/:name', async (req, res, next) => {
       }
     });
 
+    console.log("GET Author Success");
+
     // Create JSON from template using the first author data, and return to client.
     res.json({
       id:             rec.get('id')?.toString(),
@@ -299,6 +357,7 @@ app.get('/authors/:name', async (req, res, next) => {
       incomingRels:   rec.get('incoming').map(makeRel)
     });
   } catch (err) {
+    console.log("GET Author Error");
     next(err);
   } finally {
     await session.close();
@@ -340,9 +399,12 @@ app.put('/authors/:name', requireAuth, async (req, res, next) => {
       return res.status(404).json({ error: `Author "${name}" not found` });
     }
 
+    console.log("EDIT Author Success");
+
     // Return the current list of properties returned from databse.
     res.json({ properties: result.records[0].get('props') });
   } catch (err) {
+    console.log("EDIT Author Error");
     next(err);
   } finally {
     await session.close();
@@ -374,9 +436,12 @@ app.delete('/authors/:name', requireAuth, async (req, res, next) => {
       return res.status(404).json({ error: `Author "${name}" not found` });
     }
 
+    console.log("DELETE Author Success");
+
     // Return true if one or more nodes were deleted
     res.json({ deleted: true });
   } catch (err) {
+    console.log("DELETE Author Error");
     next(err);
   } finally {
     await session.close();
