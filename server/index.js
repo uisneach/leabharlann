@@ -128,7 +128,7 @@ app.get('/node/:id', async (req, res, next) => {
   // Init Neo4j driver
   const session = driver.session();
   try {
-    const result;
+    let result;
 
     if (withRels) {
       // Query node data and relationship data
