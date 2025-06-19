@@ -307,8 +307,8 @@ app.get('/authors/:name', async (req, res, next) => {
           direction:"outgoing",
           node: {
             id:    id(m),
-            label: labels(m)[0],
-            name:  coalesce(m.name, m.title)
+            labels: labels(m),
+            properties:  properties(m)
           }
         })               AS outgoing,
 
@@ -318,8 +318,8 @@ app.get('/authors/:name', async (req, res, next) => {
           direction:"incoming",
           node: {
             id:    id(n),
-            label: labels(n)[0],
-            name:  coalesce(n.name, n.title)
+            labels: labels(n),
+            properties:  properties(n)
           }
         })               AS incoming
       `,
@@ -470,8 +470,8 @@ app.get('/texts/:title', async (req, res, next) => {
           direction: "outgoing",
           node: {
             id:    id(m),
-            label: labels(m)[0],
-            name:  coalesce(m.name, m.title)
+            labels: labels(m),
+            properties:  properties(m)
           }
         })                AS outgoing,
 
@@ -481,8 +481,8 @@ app.get('/texts/:title', async (req, res, next) => {
           direction: "incoming",
           node: {
             id:    id(n),
-            label: labels(n)[0],
-            name:  coalesce(n.name, n.title)
+            labels: labels(n),
+            properties:  properties(n)
           }
         })                AS incoming
       `,
@@ -540,8 +540,8 @@ app.get('/editions/:name', async (req, res, next) => {
           direction: "outgoing",
           node: {
             id:    id(m),
-            label: labels(m)[0],
-            name:  coalesce(m.name, m.title)
+            labels: labels(m),
+            properties:  properties(m)
           }
         })               AS outgoing,
 
@@ -551,8 +551,8 @@ app.get('/editions/:name', async (req, res, next) => {
           direction: "incoming",
           node: {
             id:    id(n),
-            label: labels(n)[0],
-            name:  coalesce(n.name, n.title)
+            labels: labels(n),
+            properties:  properties(n)
           }
         })               AS incoming
       `,
