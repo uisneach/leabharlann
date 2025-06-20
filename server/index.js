@@ -131,6 +131,8 @@ app.get('/node/:id', async (req, res, next) => {
     let result;
 
     if (withRels) {
+      console.log("GET node with relations");
+
       // Query node data and relationship data
       result = await session.run(
         `
@@ -174,6 +176,8 @@ app.get('/node/:id', async (req, res, next) => {
         }))
       });
     } else {
+      console.log("GET node without relations");
+
       // Query only node data
       result = await session.run(
         `
