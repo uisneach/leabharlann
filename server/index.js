@@ -345,8 +345,8 @@ app.get('/authors/:name', async (req, res, next) => {
       direction: r.direction,
       node: {
         id:    r.node.id?.toString(),
-        label: r.node.label,
-        name:  r.node.name
+        label: r.node.labels,
+        properties:  r.node.properties
       }
     });
 
