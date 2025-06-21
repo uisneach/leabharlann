@@ -105,7 +105,14 @@
       // fetch
       const type  = document.getElementById('nodeType').value;
       const value = document.getElementById('nodeValue').value.trim();
-      const url   = `${API_BASE}/${type}/${encodeURIComponent(value)}?relations=true`;
+      let url;
+      if (!value) {
+        // No search term → fetch the entire database
+        url = `${API_BASE}/?relations=true`;
+      } else {
+        // Specific node search
+        url = `${API_BASE}/${type}/${encodeURIComponent(value)}?relations=true`;
+      }
       const res   = await fetch(url, { headers:{ 'Authorization':`Bearer ${token}`}});
       if (!res.ok) return alert(`Error ${res.status}`);
       const data  = await res.json();
@@ -118,7 +125,7 @@
         data[dir].forEach(r => {
           const n = r.node;
           if (!n?.id) return;
-          nodeMap[n.id] = { id:n.id, labels:[n.label], props:{ name:n.name }};
+          nodeMap[n.id] = { id:n.id, labels:[n.label], props:n.properties };
           const key = r.id;
           linkMap[key] = {
             id:key,
@@ -135,8 +142,20 @@
     }
 
     function updateGraph() {
+      // Tell the canvas what font we’re using (so text metrics match render)
+      ctx.font = '12px sans-serif';
+
+      // For each link, measure its label and bump the distance
+      links.forEach(d => {
+        const label = d.type || '';
+        const labelWidth = ctx.measureText(label).width;
+        // base distance (150) + full label width + small padding
+        d._dist = 150 + labelWidth + 16;
+      });
+
+
       simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(links).id(d=>d.id).distance(150))
+        .force('link', d3.forceLink(links).id(d=>d.id).distance(d => d._dist))
         .force('charge', d3.forceManyBody().strength(-200))
         .force('center', d3.forceCenter(width/2, height/2))
         .force('collide', d3.forceCollide(circleSize*1.5))
@@ -174,8 +193,6 @@
       links.forEach(d => {
         const sx=d.source.x, sy=d.source.y, tx=d.target.x, ty=d.target.y;
         let dx=tx-sx, dy=ty-sy, dist=Math.hypot(dx,dy);
-        console.log(d);
-        console.log("dist: " + dist);
         const ux=dx/dist, uy=dy/dist;
         // grab each node’s radius (fallback to circleSize)
         const rSource = d.source._r ?? circleSize;
