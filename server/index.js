@@ -50,72 +50,55 @@ app.post('/login', (req, res) => {
 });
 
 // --- Public: List up to 10 nodes + relationships ---
-app.get('/', async (req, res, next) => {
+app.get('/graph', async (req, res, next) => {
   const session = driver.session();
   try {
-    const result = await session.run(`
-      MATCH (a)-[r]->(b)
-      RETURN
-        id(r)      AS relId,
-        type(r)    AS relType,
+    // Fetch all nodes
+    const nodesResult = await session.run(
+      `MATCH (n)
+       RETURN
+         id(n)          AS id,
+         labels(n)      AS labels,
+         properties(n)  AS properties`
+    );
 
-        // Source node summary
-        id(a)               AS srcId,
-        labels(a)[0]        AS srcLabel,
-        a.name      AS srcName,
-        a.title     AS srcTitle,
+    // Fetch all relationships
+    const relsResult = await session.run(
+      `MATCH (a)-[r]->(b)
+       RETURN
+         id(r)            AS id,
+         type(r)          AS type,
+         id(a)            AS source,
+         id(b)            AS target,
+         properties(r)    AS properties`
+    );
 
-        // Target node summary
-        id(b)               AS tgtId,
-        labels(b)[0]        AS tgtLabel,
-        b.name      AS tgtName,
-        b.title     AS tgtTitle
-
-      LIMIT 25
-    `);
-
-    // Map relationships with embedded node info
-    const relationships = result.records.map(rec => ({
-      id:    rec.get('relId')?.toString(),
-      type:  rec.get('relType'),
-      source: {
-        id:    rec.get('srcId')?.toString(),
-        label: rec.get('srcLabel'),
-        // pick whichever property exists
-        name:  rec.get('srcName')  || rec.get('srcTitle')
-      },
-      target: {
-        id:    rec.get('tgtId')?.toString(),
-        label: rec.get('tgtLabel'),
-        name:  rec.get('tgtName')  || rec.get('tgtTitle')
-      }
+    // Map nodes to an object
+    const nodes = nodesResult.records.map(rec => ({
+      id:          rec.get('id')?.toString(),
+      labels:      rec.get('labels'),
+      properties:  rec.get('properties')
     }));
 
-    // Build a unique nodes list from those relationships
-    const nodeMap = {};
-    relationships.forEach(r => {
-      nodeMap[r.source.id] = {
-        id:    r.source.id,
-        labels:[r.source.label],
-        ...(r.source.name ? { name: r.source.name } : {})
-      };
-      nodeMap[r.target.id] = {
-        id:    r.target.id,
-        labels:[r.target.label],
-        ...(r.target.name ? { name: r.target.name } : {})
-      };
-    });
+    // Map relationships
+    const relationships = relsResult.records.map(rec => ({
+      id:         rec.get('id')?.toString(),
+      type:       rec.get('type'),
+      source:     rec.get('source')?.toString(),
+      target:     rec.get('target')?.toString(),
+      properties: rec.get('properties')
+    }));
 
-    res.json({
-      nodes: Object.values(nodeMap),
-      relationships
-    });
+    // Return the combined graph
+    res.json({ nodes, relationships });
+
   } catch (err) {
     next(err);
   } finally {
     await session.close();
   }
 });
+
 
 // --- GET node ---
 // Endpoint to get a node by id and all of its labels and properties.

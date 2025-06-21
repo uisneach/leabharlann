@@ -108,7 +108,7 @@
       let url;
       if (!value) {
         // No search term → fetch the entire database
-        url = `${API_BASE}/?relations=true`;
+        url = `${API_BASE}/graph?relations=true`;
       } else {
         // Specific node search
         url = `${API_BASE}/${type}/${encodeURIComponent(value)}?relations=true`;
@@ -119,22 +119,47 @@
 
       // rebuild maps
       nodeMap = {}; linkMap = {};
-      nodeMap[data.id] = { id:data.id, labels:data.labels, props:data.properties };
-
-      ['outgoingRels','incomingRels'].forEach(dir => {
-        data[dir].forEach(r => {
-          const n = r.node;
-          if (!n?.id) return;
-          nodeMap[n.id] = { id:n.id, labels:[n.label], props:n.properties };
-          const key = r.id;
-          linkMap[key] = {
-            id:key,
-            source: dir==='outgoingRels'?data.id:n.id,
-            target: dir==='outgoingRels'?n.id:data.id,
-            type:r.type
+      if (Array.isArray(data.nodes) && Array.isArray(data.relationships)) {
+        // --- WHOLE GRAPH RESPONSE ---
+        data.nodes.forEach(n => {
+          nodeMap[n.id] = { id: n.id, labels: n.labels, props: n.properties };
+        });
+        data.relationships.forEach(r => {
+          linkMap[r.id] = {
+            id:     r.id,
+            source: r.source,
+            target: r.target,
+            type:   r.type
           };
         });
-      });
+
+      } else {
+        // --- SINGLE NODE + RELATIONS RESPONSE ---
+        nodeMap[data.id] = {
+          id:     data.id,
+          labels: data.labels,
+          props:  data.properties
+        };
+
+        ['outgoingRels','incomingRels'].forEach(dir => {
+          (data[dir] || []).forEach(r => {
+            const n = r.node;
+            if (!n?.id) return;
+            nodeMap[n.id] = {
+              id:     n.id,
+              labels: n.labels,
+              props:  n.properties
+            };
+            linkMap[r.id] = {
+              id:     r.id,
+              source: dir === 'outgoingRels' ? data.id : n.id,
+              target: dir === 'outgoingRels' ? n.id    : data.id,
+              type:   r.type
+            };
+          });
+        });
+      }
+
 
       nodes = Object.values(nodeMap);
       links = Object.values(linkMap);
