@@ -39,6 +39,20 @@
       position: absolute; top: 0.5rem; right: 0.5rem;
       background: none; border: none; font-size:1.2rem;
     }
+
+    /* Color Key for Nodes */
+    #legend .legend-item {
+      display: flex;
+      align-items: center;
+      margin-left: 1rem;
+      font-size: 0.9rem;
+    }
+    #legend .legend-color {
+      width: 12px;
+      height: 12px;
+      margin-right: 0.3rem;
+      border: 1px solid #333;
+    }
   </style>
 </head>
 <body onload="init();">
@@ -51,6 +65,9 @@
     </select>
     <input id="nodeValue" class="form-control w-25" placeholder="Enter name or title" value="Homer">
     <button class="btn btn-primary" onclick="fetchAndRender()">Go</button>
+
+    <!-- Color Key for Nodes -->
+    <div id="legend" class="ms-auto d-flex align-items-center"></div>
   </div>
 
   <div id="canvas-container">
@@ -72,6 +89,13 @@
     const circleSize  = 30, arrowHeight = 5, arrowWidth = 5;
     let nodeMap = {}, linkMap = {}, nodes = [], links = [];
     let simulation, transform, canvas, ctx, width, height;
+
+    const colorMap = {
+      Author:  '#6df1a9',  // mint‐green
+      Text:    '#f1c40f',  // gold
+      Edition: '#e67e22'   // orange
+    };
+    const defaultColor = '#bdc3c7'; // light gray
 
     function init() {
       canvas = document.getElementById('graphCanvas');
@@ -160,9 +184,9 @@
         });
       }
 
-
       nodes = Object.values(nodeMap);
       links = Object.values(linkMap);
+      renderLegend();
       updateGraph();
     }
 
@@ -205,9 +229,11 @@
         const w=ctx.measureText(label).width, h=12;
         const r=Math.max(circleSize,w/2+8,h/2+8);
         d._r = r;
+
+        const nodeLabel = d.labels[0];
         ctx.beginPath();
         ctx.arc(d.x,d.y,r,0,2*Math.PI);
-        ctx.fillStyle='#6df1a9'; ctx.fill();
+        ctx.fillStyle=colorMap[nodeLabel] || defaultColor; ctx.fill();
         ctx.strokeStyle='#333'; ctx.stroke();
         ctx.fillStyle='#000';
         ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -292,6 +318,28 @@
 
     function closePanel() {
       document.getElementById('info-panel').classList.remove('open');
+    }
+
+    function renderLegend() {
+      const seen = new Set(nodes.map(d => d.labels[0]));
+      const legendEl = document.getElementById('legend');
+      legendEl.innerHTML = ''; // clear out old
+
+      seen.forEach(label => {
+        const color = colorMap[label] || defaultColor;
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+
+        const box = document.createElement('span');
+        box.className = 'legend-color';
+        box.style.backgroundColor = color;
+
+        const txt = document.createElement('span');
+        txt.textContent = label;
+
+        item.append(box, txt);
+        legendEl.appendChild(item);
+      });
     }
   </script>
 </body>
