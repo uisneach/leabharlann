@@ -49,6 +49,35 @@ app.post('/login', (req, res) => {
   res.status(401).json({ error: 'Invalid credentials' });
 });
 
+// --- Shared helper to fetch all nodes by label ---
+async function fetchAllByLabel(label) {
+  // Basic safety: ensure label is a valid Neo4j identifier
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(label)) {
+    throw new Error(`Invalid label "${label}"`);
+  }
+
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (n:${label})
+      RETURN
+        id(n)         AS id,
+        labels(n)     AS labels,
+        properties(n) AS properties
+      `
+    );
+    // Map to simple JS objects
+    return result.records.map(rec => ({
+      id:         rec.get('id').toString(),
+      labels:     rec.get('labels'),
+      properties: rec.get('properties')
+    }));
+  } finally {
+    await session.close();
+  }
+}
+
 // --- Public: List up to 10 nodes + relationships ---
 app.get('/graph', async (req, res, next) => {
   const session = driver.session();
@@ -506,6 +535,16 @@ app.get('/texts/:title', async (req, res, next) => {
   }
 });
 
+// --- GET all authors ---
+app.get('/authors', async (req, res, next) => {
+  try {
+    const authors = await fetchAllByLabel('Author');
+    res.json(authors);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /editions/:name
 app.get('/editions/:name', async (req, res, next) => {
   const editionName = req.params.name;
@@ -573,6 +612,26 @@ app.get('/editions/:name', async (req, res, next) => {
     next(err);
   } finally {
     await session.close();
+  }
+});
+
+// --- GET all texts ---
+app.get('/texts', async (req, res, next) => {
+  try {
+    const texts = await fetchAllByLabel('Text');
+    res.json(texts);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- GET all editions ---
+app.get('/editions', async (req, res, next) => {
+  try {
+    const editions = await fetchAllByLabel('Edition');
+    res.json(editions);
+  } catch (err) {
+    next(err);
   }
 });
 

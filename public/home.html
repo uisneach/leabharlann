@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Leabharlann Ghealac Home</title>
+  <!-- Bootstrap for layout & basic styles -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-KK94CHFLLe+nY2dmCWGMq91rCGa5gtU4mk92HdvYe+M/SXH301p5ILy+dN9+nJOZ"
+    crossorigin="anonymous"
+  >
+  <style>
+    body {
+      font-family: "Georgia","Times New Roman",serif;
+      background: #f8f9fa;
+      margin: 0;
+    }
+    header {
+      background: #3366cc;
+      color: white;
+      padding: 0.5rem 1rem;
+    }
+    header .navbar-brand {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    header .navbar-nav .nav-link { color: white; }
+    #content {
+      margin: 1rem auto;
+      max-width: 1200px;
+      background: white;
+      padding: 1rem;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    h2.section-title {
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 0.3rem;
+      margin-bottom: 0.5rem;
+      font-size: 1.25rem;
+    }
+    ul.node-list {
+      list-style: none;
+      padding-left: 0;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    ul.node-list li {
+      padding: 0.15rem 0;
+    }
+    ul.node-list a {
+      text-decoration: none;
+      color: #3366cc;
+    }
+    ul.node-list a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <nav class="navbar navbar-expand-lg">
+      <a class="navbar-brand" href="#">
+        <img src="logo.png" alt="Logo" width="32" height="32" class="d-inline-block align-text-top">
+        Leabharlann Ghealac
+      </a>
+      <form id="search-form" class="d-flex mx-3" style="flex:1;">
+        <input id="search-input" class="form-control me-2" type="search" placeholder="Search authors, texts, editions…" aria-label="Search">
+        <button class="btn btn-light" type="submit">Search</button>
+      </form>
+      <ul class="navbar-nav">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="profileMenu" role="button" data-bs-toggle="dropdown">
+            Account
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileMenu">
+            <li><a class="dropdown-item" href="#">Log in</a></li>
+            <li><a class="dropdown-item" href="#">Register</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <div id="content" class="container-fluid">
+    <div class="row">
+      
+      <!-- Authors Column -->
+      <div class="col-md-4">
+        <h2 class="section-title">Authors</h2>
+        <ul id="authors-list" class="node-list"></ul>
+      </div>
+
+      <!-- Texts Column -->
+      <div class="col-md-4">
+        <h2 class="section-title">Texts</h2>
+        <ul id="texts-list" class="node-list"></ul>
+      </div>
+
+      <!-- Editions Column -->
+      <div class="col-md-4">
+        <h2 class="section-title">Editions</h2>
+        <ul id="editions-list" class="node-list"></ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bootstrap JS (for dropdowns) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-ENjdO4Dr2bkBIFxQpeoYz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVQSZe"
+    crossorigin="anonymous"></script>
+
+  <script>
+    const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
+    const token    = localStorage.getItem('token');
+
+    // Utility: fill a list from array of items
+    function populateList(containerId, items, labelKey, detailPage) {
+      const ul = document.getElementById(containerId);
+      ul.innerHTML = '';
+      items.forEach(item => {
+        const li = document.createElement('li');
+        const a  = document.createElement('a');
+        const label = item.properties[labelKey];
+        a.textContent = label || item.id;
+        a.href = `${detailPage}.html?${labelKey}=${encodeURIComponent(label)}`;
+        li.append(a);
+        ul.append(li);
+      });
+    }
+
+    // Fetch all of a given type
+    async function fetchAll(type) {
+      const res = await fetch(`${API_BASE}/${type}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error(`Failed to load ${type}`);
+      return res.json();  // expects [{id, labels, properties},...]
+    }
+
+    // Load all three lists
+    async function loadHome() {
+      try {
+        const [authors, texts, editions] = await Promise.all([
+          fetchAll('authors'),
+          fetchAll('texts'),
+          fetchAll('editions')
+        ]);
+        populateList('authors-list', authors, 'name',     'author');
+        populateList('texts-list',   texts,   'title',    'text');
+        populateList('editions-list',editions,'title',    'edition');
+      } catch (err) {
+        console.error(err);
+        document.getElementById('content').innerHTML =
+          `<p class="text-danger">Error loading data: ${err.message}</p>`;
+      }
+    }
+
+    // Search box handler (just redirects for now)
+    document.getElementById('search-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const q = document.getElementById('search-input').value.trim();
+      if (!q) return;
+      // naive: search authors by name first
+      window.location = `author.html?name=${encodeURIComponent(q)}`;
+    });
+
+    // On load
+    window.addEventListener('DOMContentLoaded', loadHome);
+  </script>
+</body>
+</html>
