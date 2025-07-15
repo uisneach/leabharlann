@@ -547,7 +547,7 @@ app.get('/authors', async (req, res, next) => {
 
 // GET /editions/:title
 app.get('/editions/:title', async (req, res, next) => {
-  const editionName = req.params.name;
+  const editionTitle = req.params.title;
   const session = driver.session();
   try {
     const result = await session.run(
@@ -582,7 +582,7 @@ app.get('/editions/:title', async (req, res, next) => {
           }
         })               AS incoming
       `,
-      { val: editiontitle }
+      { val: editionTitle }
     );
 
     if (result.records.length === 0) {
