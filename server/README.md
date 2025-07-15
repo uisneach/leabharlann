@@ -19,6 +19,13 @@ Nodes:
   - title*
   - publication-date*
   - ext-link
+  - edition-of*    # Points to a PUBLICATION
+- Publication
+  - title*
+  - editions       # This should be a list of other nodes (IDs?)
+  - published-by   # Points to a PUBLISHER
+- Publisher
+  - name*
 
 \*required
 

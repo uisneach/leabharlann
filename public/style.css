@@ -1,0 +1,116 @@
+@font-face {
+    font-family: 'Bunchlo';
+    src: url('./assets/bunchlo/bungc.woff2') format('woff2'),
+    font-weight: normal;
+    font-style: normal;
+}
+
+body {
+  font-family: "Georgia","Times New Roman",serif;
+  background: #f8f9fa;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+header {
+  background: #3366cc;
+  color: white;
+  padding: 0.5rem 1rem;
+}
+header .navbar-brand {
+  font-family: "Bunchlo";
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+header .navbar-nav .nav-link .navbar-text { color: white; }
+#content {
+  margin: 1rem auto;
+  max-width: 1200px;
+  background: white;
+  padding: 1rem;
+  box-shadow: 0 0 5px rgba(0,0,0,0.1);
+}
+h2.section-title {
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+}
+ul.node-list {
+  list-style: none;
+  padding-left: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+ul.node-list li {
+  padding: 0.15rem 0;
+}
+ul.node-list a {
+  text-decoration: none;
+  color: #3366cc;
+}
+ul.node-list a:hover {
+  text-decoration: underline;
+}
+
+h1.page-title {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.3rem;
+}
+
+/* Infobox on right */
+.infobox {
+  border: 1px solid #aaa;
+  background: #f9f9f9;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.infobox table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.infobox th,
+.infobox td {
+  padding-bottom: 0.3rem;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.infobox th {
+  text-align: left;
+  vertical-align: top;
+  padding-right: 0.5rem;
+  font-weight: bold;
+}
+
+/* Relationships section */
+.rels-section h3 {
+  margin-top: 1.5rem;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.3rem;
+  font-size: 1.25rem;
+}
+.rels-list {
+  list-style: none;
+  padding-left: 0;
+}
+.rels-list li {
+  margin-bottom: 0.5rem;
+}
+.rels-list a {
+  color: #3366cc;
+  text-decoration: none;
+}
+.rels-list a:hover {
+  text-decoration: underline;
+}
