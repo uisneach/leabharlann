@@ -545,14 +545,14 @@ app.get('/authors', async (req, res, next) => {
   }
 });
 
-// GET /editions/:name
-app.get('/editions/:name', async (req, res, next) => {
+// GET /editions/:title
+app.get('/editions/:title', async (req, res, next) => {
   const editionName = req.params.name;
   const session = driver.session();
   try {
     const result = await session.run(
       `
-      MATCH (e:Edition {name: $val})
+      MATCH (e:Edition {title: $val})
       OPTIONAL MATCH (e)-[r]->(m)
       OPTIONAL MATCH (n)-[r2]->(e)
       RETURN
@@ -582,11 +582,11 @@ app.get('/editions/:name', async (req, res, next) => {
           }
         })               AS incoming
       `,
-      { val: editionName }
+      { val: editiontitle }
     );
 
     if (result.records.length === 0) {
-      return res.status(404).json({ error: `Edition "${editionName}" not found` });
+      return res.status(404).json({ error: `Edition "${editionTitle}" not found` });
     }
 
     const rec = result.records[0];
@@ -634,7 +634,6 @@ app.get('/editions', async (req, res, next) => {
     next(err);
   }
 });
-
 
 app.post('/cypher', requireAuth, async (req, res, next) => {
   const { query } = req.body;
