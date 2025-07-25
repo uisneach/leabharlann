@@ -14,18 +14,28 @@ Nodes:
 - Text
   - title*         # This should be its native-language title
   - english-title  # This should be its English title
+  - language
   - description
+  - secondary-literature
+- Source
+- Secondary-Literature
+- Manuscript
+  - title*
+  - place-of-origin
+  - date-of-origin
+  - ext-link
 - Edition
   - title*
   - publication-date*
   - ext-link
-  - edition-of*    # Points to a PUBLICATION
 - Publication
   - title*
   - editions       # This should be a list of other nodes (IDs?)
   - published-by   # Points to a PUBLISHER
 - Publisher
   - name*
+  - website-link
+  - wiki-link
 
 \*required
 
@@ -44,6 +54,26 @@ Endpoints:
   - Parameters: text-title
   - Returns: JSON of text info and all relationships relating to that text.
 - GET Edition
+
+
+Insert this code into any GraphViz editor to see the structure:
+
+```
+digraph G {
+  graph [fontsize=8, fontname="Helvetica"];
+  node  [fontsize=10, fontname="Helvetica"];
+  edge  [fontsize=8, fontname="Helvetica"];
+ 
+  Text -> Author [label="WRITTEN_BY"];
+  Text -> Edition [label="PUBLISHED_IN"];
+  Edition -> Publisher [label="PUBLISHED_BY"];
+  Edition -> Series [label="EDITION_OF"];
+  Edition -> Journal [label="EDITION_OF"];
+  Series -> Publisher [label="PUBLISHED_BY"];
+  Journal -> Publisher [label="PUBLISHED_BY"];
+  Edition -> Translator [label="TRANSLATED_BY"];
+}
+```
 
 ### API Return Data
 
