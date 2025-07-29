@@ -114,3 +114,33 @@ h1.page-title {
 .rels-list a:hover {
   text-decoration: underline;
 }
+
+.modal-content {
+  border-radius: 8px;
+  color: black;
+}
+
+.modal-header {
+  border-bottom: 1px solid #dee2e6;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.form-label {
+  font-weight: 500;
+}
+
+.text-danger {
+  font-size: 0.875rem;
+}
+
+.create-btn { 
+  font-size: 1.2rem; 
+  padding: 0.25rem 0.5rem; 
+}
+
+.container { max-width: 600px; }
+.table { margin-bottom: 0; }
+.table input { margin: 0.25rem 0; }

@@ -129,109 +129,74 @@ app.get('/graph', async (req, res, next) => {
 });
 
 
-// --- GET node ---
-// Endpoint to get a node by id and all of its labels and properties.
 app.get('/node/:id', async (req, res, next) => {
   const nodeId = parseInt(req.params.id, 10);
-
-  // Check whether client wants relationship data or only node data.
   const withRels = req.query.relations === 'true';
-
-  // Init Neo4j driver
   const session = driver.session();
+
   try {
-    let result;
+    const result = await session.run(
+      `
+      MATCH (n)
+      WHERE id(n) = $nodeId
+      ${withRels ? `
+      OPTIONAL MATCH (n)-[r]->(m)
+      OPTIONAL MATCH (p)-[r2]->(n)
+      RETURN
+        id(n) AS id,
+        labels(n) AS labels,
+        properties(n) AS props,
+        collect(DISTINCT {
+          relId: id(r),
+          type: type(r),
+          direction: "outgoing",
+          node: { id: id(m), labels: labels(m), properties: properties(m) }
+        }) AS outgoing,
+        collect(DISTINCT {
+          relId: id(r2),
+          type: type(r2),
+          direction: "incoming",
+          node: { id: id(n), labels: labels(p), properties: properties(p) }
+        }) AS incoming
+      ` : `
+      RETURN
+        id(n) AS id,
+        labels(n) AS labels,
+        properties(n) AS props;
+      `}
+      `,
+      { nodeId }
+    );
 
-    if (withRels) {
-      console.log("GET node with relations");
-
-      // Query node data and relationship data
-      result = await session.run(
-        `
-        MATCH (n)
-        WHERE id(n) = $nodeId
-        OPTIONAL MATCH (n)-[r]->(m)
-        RETURN
-          id(n)            AS id,
-          labels(n)        AS labels,
-          properties(n)    AS props,
-          collect({
-            id:     id(r),
-            type:   type(r),
-            target: {
-              id:    id(m),
-              labels: labels(m),
-              properties:  properties(m)
-            }
-          })               AS relations
-        `,
-        { nodeId }
-      );
-
-      if (result.records.length === 0) {
-        return res.status(404).json({ error: 'Node not found' });
-      }
-
-      const record = result.records[0];
-      res.json({
-        id:        record.get('id')?.toString(),
-        labels:    record.get('labels'),
-        properties: record.get('props'),
-        relations: record.get('relations').map(r => ({
-          id:     r.id?.toString(),
-          type:   r.type,
-          target: {
-            id:    r.target.id?.toString(),
-            labels: r.target.labels,
-            properties:  r.target.properties
-          }
-        }))
-      });
-    } else {
-      console.log("GET node without relations");
-
-      // Query only node data
-      result = await session.run(
-        `
-        MATCH (n)
-        WHERE id(n) = $nodeId
-        OPTIONAL MATCH (n)-[r]->(m)
-        RETURN
-          id(n)            AS id,
-          labels(n)        AS labels,
-          properties(n)    AS props,
-        `,
-        { nodeId }
-      );
-
-      if (result.records.length === 0) {
-        return res.status(404).json({ error: 'Node not found' });
-      }
-
-      console.log("GET Node Success");
-
-      const record = result.records[0];
-      res.json({
-        id:        record.get('id')?.toString(),
-        labels:    record.get('labels'),
-        properties: record.get('props'),
-      });
-    }
-
-    if (result.records.length === 0) {
+    if (!result.records.length) {
       return res.status(404).json({ error: 'Node not found' });
     }
 
-    console.log("GET Node Success");
-
     const record = result.records[0];
-    res.json({
-      id:        record.get('id')?.toString(),
-      labels:    record.get('labels'),
-      properties: record.get('props'),
-    });
+    const response = {
+      id: record.get('id').toString(),
+      labels: record.get('labels'),
+      properties: record.get('props')
+    };
+
+    if (withRels) {
+      const makeRel = r => ({
+        id: r.relId?.toString(),
+        type: r.type,
+        direction: r.direction,
+        node: {
+          id: r.node.id?.toString(),
+          labels: r.node.labels,
+          properties: r.node.properties
+        }
+      });
+      response.outgoingRels = record.get('outgoing').map(makeRel);
+      response.incomingRels = record.get('incoming').map(makeRel);
+    }
+
+    res.json(response);
   } catch (err) {
-    console.log("GET Node Error");
+    console.error('GET Node Error:', err);
     next(err);
   } finally {
     await session.close();

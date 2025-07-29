@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Create Relationship - Leabharlann Ghealac</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <nav class="navbar">
+      <a class="navbar-brand" href="index.html">An Leabharlann Ghealach</a>
+      <div class="navbar-text">
+        <a href="#" class="nav-link d-inline px-2" id="profileMenu">Account</a>
+      </div>
+    </nav>
+  </header>
+  <div class="container mt-4">
+    <h1>Create Relationship</h1>
+    <h3>Source Node</h3>
+    <p><strong>Type:</strong> <span id="fromType"></span></p>
+    <p><strong>ID:</strong> <span id="fromId"></span></p>
+    <p><strong>Name:</strong> <span id="fromName"></span></p>
+    <form id="createRelationshipForm">
+      <div class="mb-3">
+        <label for="toLabel" class="form-label">Target Node Type</label>
+        <select id="toLabel" class="form-select" required>
+          <option value="Author">Author</option>
+          <option value="Text">Text</option>
+          <option value="Edition">Edition</option>
+          <option value="Publisher">Publisher</option>
+          <option value="Series">Series</option>
+          <option value="Journal">Journal</option>
+          <option value="Translator">Translator</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label for="toNodeSearch" class="form-label">Search Target Node</label>
+        <input type="text" class="form-control" id="toNodeSearch" placeholder="Enter name or title">
+        <ul id="searchResults" class="list-group mt-2"></ul>
+        <input type="hidden" id="toId" required>
+      </div>
+      <div class="mb-3">
+        <label for="relType" class="form-label">Relationship Type</label>
+        <input type="text" class="form-control" id="relType" placeholder="e.g., WROTE" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Relationship Properties</label>
+        <table class="table table-bordered" id="relPropertiesTable">
+          <thead>
+            <tr>
+              <th scope="col">Attribute Name</th>
+              <th scope="col">Value</th>
+            </tr>
+          </thead>
+          <tbody id="relProperties">
+            <tr class="property-row">
+              <td><input type="text" class="form-control" name="prop-name-0" placeholder="e.g., role"></td>
+              <td><input type="text" class="form-control" name="prop-value-0"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <button type="button" class="btn btn-secondary mb-3" id="addProperty">Add Property</button>
+      <div id="errorMessage" class="text-danger mb-3" style="display: none;"></div>
+      <button type="submit" class="btn btn-primary">Create Relationship</button>
+      <a href="home.html" class="btn btn-link">Cancel</a>
+    </form>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <script>
+    const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
+    let propertyCount = 1;
+
+    function updateProfileMenu(username) {
+      const profileMenu = document.getElementById('profileMenu');
+      profileMenu.textContent = username;
+      profileMenu.classList.add('dropdown-toggle');
+      profileMenu.setAttribute('data-bs-toggle', 'dropdown');
+      const navItem = profileMenu.parentElement;
+      const existingDropdown = navItem.querySelector('.dropdown-menu');
+      if (existingDropdown) existingDropdown.remove();
+      const dropdown = document.createElement('ul');
+      dropdown.className = 'dropdown-menu dropdown-menu-end';
+      const logoutItem = document.createElement('li');
+      const logoutLink = document.createElement('a');
+      logoutLink.className = 'dropdown-item';
+      logoutLink.href = '#';
+      logoutLink.textContent = 'Log out';
+      logoutLink.addEventListener('click', e => {
+        e.preventDefault();
+        localStorage.removeItem('token');
+        window.location.href = 'home.html';
+      });
+      logoutItem.appendChild(logoutLink);
+      dropdown.appendChild(logoutItem);
+      navItem.appendChild(dropdown);
+    }
+
+    function checkAuthStatus() {
+      const token = localStorage.getItem('token');
+      if (!token) window.location.href = 'home.html';
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        updateProfileMenu(payload.username || 'User');
+      } catch (e) {
+        console.error('Invalid token:', e);
+        localStorage.removeItem('token');
+        window.location.href = 'home.html';
+      }
+    }
+
+    async function loadSourceNode() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const fromType = urlParams.get('fromType');
+      const fromId = urlParams.get('fromId');
+      if (!fromType || !fromId) {
+        document.querySelector('.container').innerHTML = '<p class="text-danger">Invalid source node</p>';
+        return;
+      }
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE}/node/${fromId}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        if (!response.ok) throw new Error('Failed to load source node');
+        const data = await response.json();
+        document.getElementById('fromType').textContent = fromType;
+        document.getElementById('fromId').textContent = data.id;
+        document.getElementById('fromName').textContent = data.properties.name || data.properties.title || data.id;
+      } catch (error) {
+        document.querySelector('.container').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+      }
+    }
+
+    document.getElementById('toNodeSearch').addEventListener('input', async e => {
+      const query = e.target.value.trim();
+      const toLabel = document.getElementById('toLabel').value;
+      const resultsList = document.getElementById('searchResults');
+      resultsList.innerHTML = '';
+      if (query.length < 2) return;
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE}/${toLabel.toLowerCase()}s`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        if (!response.ok) throw new Error('Failed to search nodes');
+        const nodes = await response.json();
+        const filtered = nodes.filter(node =>
+          (node.properties.name || node.properties.title || node.id).toLowerCase().includes(query.toLowerCase())
+        );
+        filtered.forEach(node => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item list-group-item-action';
+          li.textContent = node.properties.name || node.properties.title || node.id;
+          li.addEventListener('click', () => {
+            document.getElementById('toId').value = node.id;
+            document.getElementById('toNodeSearch').value = li.textContent;
+            resultsList.innerHTML = '';
+          });
+          resultsList.appendChild(li);
+        });
+      } catch (error) {
+        console.error('Search error:', error);
+      }
+    });
+
+    document.getElementById('addProperty').addEventListener('click', () => {
+      const tbody = document.getElementById('relProperties');
+      const row = document.createElement('tr');
+      row.className = 'property-row';
+      row.innerHTML = `
+        <td><input type="text" class="form-control" name="prop-name-${propertyCount}" placeholder="e.g., role"></td>
+        <td><input type="text" class="form-control" name="prop-value-${propertyCount}"></td>
+      `;
+      tbody.appendChild(row);
+      propertyCount++;
+    });
+
+    document.getElementById('createRelationshipForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const urlParams = new URLSearchParams(window.location.search);
+      const fromType = urlParams.get('fromType');
+      const fromId = urlParams.get('fromId');
+      const toLabel = document.getElementById('toLabel').value;
+      const toId = document.getElementById('toId').value;
+      const relType = document.getElementById('relType').value.trim().toUpperCase();
+      const relProps = {};
+      document.querySelectorAll('.property-row').forEach((row, index) => {
+        const name = row.querySelector(`[name="prop-name-${index}"]`).value.trim();
+        const value = row.querySelector(`[name="prop-value-${index}"]`).value.trim();
+        if (name && value && !/[^a-zA-Z0-9_]/.test(name)) relProps[name] = value;
+      });
+      if (!fromType || !fromId || !toLabel || !toId || !relType || /[^a-zA-Z0-9_]/.test(relType)) {
+        document.getElementById('errorMessage').style.display = 'block';
+        document.getElementById('errorMessage').textContent = 'Invalid input: Ensure all fields are filled and use letters, numbers, or underscores';
+        return;
+      }
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE}/relation`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ fromLabel: fromType, fromId, toLabel, toId, relType, relProps })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to create relationship');
+        window.location.href = `info.html?type=${encodeURIComponent(fromType.toLowerCase() + 's')}&value=${encodeURIComponent(fromId)}`;
+      } catch (error) {
+        document.getElementById('errorMessage').style.display = 'block';
+        document.getElementById('errorMessage').textContent = error.message;
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      checkAuthStatus();
+      loadSourceNode();
+    });
+  </script>
+</body>
+</html>
