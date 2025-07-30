@@ -8,18 +8,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <nav class="navbar">
-      <a class="navbar-brand" href="index.html">An Leabharlann Ghealach</a>
-      <form id="search-form" class="d-flex mx-3" style="flex:1;">
-        <input id="search-input" class="form-control me-2" type="search" placeholder="Search…" aria-label="Search">
-        <button class="btn btn-light" type="submit">Search</button>
-      </form>
-      <div class="navbar-text">
-        <a href="#" class="nav-link d-inline px-2" id="profileMenu">Account</a>
-      </div>
-    </nav>
-  </header>
+  <div id="header-placeholder"></div>
   <div id="content" class="row">
     <div class="col-md-8">
       <h1 class="page-title" id="page-title">Loading…</h1>
@@ -48,43 +37,12 @@
     const type = params.get('type');
     const value = params.get('value');
 
-    function updateProfileMenu(username) {
-      const profileMenu = document.getElementById('profileMenu');
-      profileMenu.textContent = username;
-      profileMenu.classList.add('dropdown-toggle');
-      profileMenu.setAttribute('data-bs-toggle', 'dropdown');
-      const navItem = profileMenu.parentElement;
-      const existingDropdown = navItem.querySelector('.dropdown-menu');
-      if (existingDropdown) existingDropdown.remove();
-      const dropdown = document.createElement('ul');
-      dropdown.className = 'dropdown-menu dropdown-menu-end';
-      const logoutItem = document.createElement('li');
-      const logoutLink = document.createElement('a');
-      logoutLink.className = 'dropdown-item';
-      logoutLink.href = '#';
-      logoutLink.textContent = 'Log out';
-      logoutLink.addEventListener('click', e => {
-        e.preventDefault();
-        localStorage.removeItem('token');
-        window.location.reload();
-      });
-      logoutItem.appendChild(logoutLink);
-      dropdown.appendChild(logoutItem);
-      navItem.appendChild(dropdown);
-      document.getElementById('createRelationshipBtn').style.display = 'block';
-    }
-
-    function checkAuthStatus() {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          updateProfileMenu(payload.username || 'User');
-        } catch (e) {
-          console.error('Invalid token:', e);
-          localStorage.removeItem('token');
-        }
-      }
+    async function loadHeader() {
+      const response = await fetch('partials/header.html');
+      document.getElementById('header-placeholder').innerHTML = await response.text();
+      const headerScript = document.createElement('script');
+      headerScript.src = 'partials/header.js';
+      document.head.appendChild(headerScript);
     }
 
     async function loadInfo() {
@@ -197,14 +155,8 @@
       }
     }
 
-    document.getElementById('search-form').addEventListener('submit', e => {
-      e.preventDefault();
-      const q = document.getElementById('search-input').value.trim();
-      if (q) window.location = `info.html?type=authors&value=${encodeURIComponent(q)}`;
-    });
-
     window.addEventListener('DOMContentLoaded', () => {
-      checkAuthStatus();
+      loadHeader();
       loadInfo();
     });
   </script>

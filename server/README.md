@@ -16,7 +16,6 @@ Nodes:
   - english-title  # This should be its English title
   - language
   - description
-  - secondary-literature
 - Source
 - Secondary-Literature
 - Manuscript
