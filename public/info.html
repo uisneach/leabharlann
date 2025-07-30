@@ -10,7 +10,7 @@
 <body>
   <header>
     <nav class="navbar navbar-expand-lg">
-      <a class="navbar-brand" href="index.html">
+      <a class="navbar-brand" href="home.html">
         <img src="https://uisneac.com/images/Gold-Celtic-Design.png" alt="Logo" width="32" height="32" class="d-inline-block align-text-top">
         An Leabharlann Ghealach
       </a>
@@ -50,8 +50,8 @@
       </div>
     </div>
     <script>
+      const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
       function updateProfileMenu(username) {
-        console.log("updateProfileMenu");
         const profileMenu = document.getElementById('profileMenu');
         if (!profileMenu) return;
         const navItem = profileMenu.parentElement;
@@ -83,7 +83,6 @@
       }
 
       function checkAuthStatus() {
-        console.log("checkAuthStatus");
         const token = localStorage.getItem('token');
         if (token) {
           try {
@@ -114,7 +113,6 @@
       
         if (profileMenu) {
           profileMenu.addEventListener('click', e => {
-            console.log("click");
             e.preventDefault();
             if (!localStorage.getItem('token')) {
               const modal = new bootstrap.Modal(document.getElementById('loginModal'));
@@ -163,7 +161,7 @@
       }
 
       window.addEventListener('DOMContentLoaded', () => {
-        attachEventListeners()
+        attachEventListeners();
         checkAuthStatus();
       });
     </script>
@@ -171,7 +169,28 @@
   <div id="content" class="row">
     <div class="col-md-8">
       <h1 class="page-title" id="page-title">Loading…</h1>
-      <div id="properties"></div>
+      <button id="editPropertiesBtn" class="btn btn-primary mt-3" style="display: none;">Edit Properties</button>
+      <div id="editPropertiesForm" class="mt-3" style="display: none;">
+        <form id="updateForm">
+          <div class="mb-3">
+            <label class="form-label">Properties</label>
+            <table class="table table-bordered" id="propertiesTable">
+              <thead>
+                <tr>
+                  <th scope="col">Attribute Name</th>
+                  <th scope="col">Value</th>
+                </tr>
+              </thead>
+              <tbody id="properties"></tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-secondary mb-3" id="addProperty">Add Property</button>
+          <div id="updateErrorMessage" class="text-danger mb-3" style="display: none;"></div>
+          <button type="submit" class="btn btn-primary">Update Properties</button>
+          <button type="button" class="btn btn-link" id="cancelEdit">Cancel</button>
+        </form>
+      </div>
+      <div id="propertiesDisplay"></div>
       <div class="rels-section" id="outgoing-section" style="display:none;">
         <h3>Outgoing Relationships</h3>
         <ul class="rels-list" id="outgoing-list"></ul>
@@ -195,6 +214,8 @@
     const params = new URLSearchParams(window.location.search);
     const type = params.get('type');
     const value = params.get('value');
+    let nodeId = null;
+    let propertyCount = 0;
 
     async function loadInfo() {
       if (!type || !value) {
@@ -206,21 +227,37 @@
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
         const url = `${API_BASE}/${type}/${encodeURIComponent(value)}?relations=true`;
         const res = await fetch(url, { headers });
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          window.location.href = 'home.html';
+          return;
+        }
         if (!res.ok) throw new Error(`Error ${res.status}`);
         const data = await res.json();
+        nodeId = data.id; // Store node ID for editing
         renderPage(data);
-        document.getElementById('createRelationshipBtn').href = `relationship.html?fromType=${encodeURIComponent(type.slice(0, -1))}&fromId=${encodeURIComponent(data.id)}`;
+        updateAuthUI();
       } catch (error) {
         document.getElementById('page-title').textContent = `Error: ${error.message}`;
       }
     }
 
+    function updateAuthUI() {
+      const isAuthenticated = !!localStorage.getItem('token');
+      document.getElementById('createRelationshipBtn').style.display = isAuthenticated ? 'block' : 'none';
+      document.getElementById('editPropertiesBtn').style.display = isAuthenticated ? 'block' : 'none';
+    }
+
     function renderPage(data) {
       const title = data.properties.name || data.properties.title || data.id;
       document.getElementById('page-title').textContent = title;
+      document.getElementById('createRelationshipBtn').href = `relationship.html?fromType=${encodeURIComponent(type.slice(0, -1))}&fromId=${encodeURIComponent(data.id)}`;
       const infoTable = document.getElementById('info-table');
+      const propertiesDisplay = document.getElementById('propertiesDisplay');
       infoTable.innerHTML = '';
+      propertiesDisplay.innerHTML = '';
       Object.entries(data.properties).forEach(([k, v]) => {
+        // Info table (sidebar)
         const tr = document.createElement('tr');
         const th = document.createElement('th');
         th.textContent = k;
@@ -251,6 +288,21 @@
         }
         tr.append(th, td);
         infoTable.appendChild(tr);
+      });
+
+      // Populate edit form
+      const propertiesTbody = document.getElementById('properties');
+      propertiesTbody.innerHTML = '';
+      propertyCount = 0;
+      Object.entries(data.properties).forEach(([k, v]) => {
+        const row = document.createElement('tr');
+        row.className = 'property-row';
+        row.innerHTML = `
+          <td><input type="text" class="form-control" name="prop-name-${propertyCount}" value="${k}" required></td>
+          <td><input type="text" class="form-control" name="prop-value-${propertyCount}" value="${v}" required></td>
+        `;
+        propertiesTbody.appendChild(row);
+        propertyCount++;
       });
 
       let outgoing = data.outgoingRels || [];
@@ -306,8 +358,85 @@
       }
     }
 
+    document.getElementById('editPropertiesBtn').addEventListener('click', () => {
+      document.getElementById('editPropertiesForm').style.display = 'block';
+      document.getElementById('editPropertiesBtn').style.display = 'none';
+      document.getElementById('propertiesDisplay').style.display = 'none';
+    });
+
+    document.getElementById('cancelEdit').addEventListener('click', () => {
+      document.getElementById('editPropertiesForm').style.display = 'none';
+      document.getElementById('editPropertiesBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
+      document.getElementById('propertiesDisplay').style.display = 'block';
+    });
+
+    document.getElementById('addProperty').addEventListener('click', () => {
+      const tbody = document.getElementById('properties');
+      const row = document.createElement('tr');
+      row.className = 'property-row';
+      row.innerHTML = `
+        <td><input type="text" class="form-control" name="prop-name-${propertyCount}" placeholder="e.g., name, title" required></td>
+        <td><input type="text" class="form-control" name="prop-value-${propertyCount}" required></td>
+      `;
+      tbody.appendChild(row);
+      propertyCount++;
+    });
+
+    document.getElementById('updateForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const properties = {};
+      let invalidProp = false;
+      document.querySelectorAll('.property-row').forEach((row, index) => {
+        const name = row.querySelector(`[name="prop-name-${index}"]`).value.trim();
+        const value = row.querySelector(`[name="prop-value-${index}"]`).value.trim();
+        if (name && value) {
+          if (/[^a-zA-Z0-9_]/.test(name)) {
+            invalidProp = true;
+            return;
+          }
+          properties[name] = value;
+        }
+      });
+      if (invalidProp) {
+        document.getElementById('updateErrorMessage').style.display = 'block';
+        document.getElementById('updateErrorMessage').textContent = 'Property names can only contain letters, numbers, or underscores';
+        return;
+      }
+      if (Object.keys(properties).length === 0) {
+        document.getElementById('updateErrorMessage').style.display = 'block';
+        document.getElementById('updateErrorMessage').textContent = 'At least one property is required';
+        return;
+      }
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          window.location.href = 'home.html';
+          return;
+        }
+        const response = await fetch(`${API_BASE}/node/${nodeId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(properties)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to update node');
+        document.getElementById('updateErrorMessage').style.display = 'none';
+        document.getElementById('editPropertiesForm').style.display = 'none';
+        document.getElementById('editPropertiesBtn').style.display = 'block';
+        document.getElementById('propertiesDisplay').style.display = 'block';
+        renderPage(data); // Refresh page with updated data
+      } catch (error) {
+        document.getElementById('updateErrorMessage').style.display = 'block';
+        document.getElementById('updateErrorMessage').textContent = error.message;
+      }
+    });
+
     window.addEventListener('DOMContentLoaded', () => {
       loadInfo();
+      document.addEventListener('authChange', updateAuthUI);
     });
   </script>
 </body>

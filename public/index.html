@@ -52,7 +52,6 @@
     </div>
     <script>
       function updateProfileMenu(username) {
-        console.log("updateProfileMenu");
         const profileMenu = document.getElementById('profileMenu');
         if (!profileMenu) return;
         const navItem = profileMenu.parentElement;
@@ -84,7 +83,6 @@
       }
 
       function checkAuthStatus() {
-        console.log("checkAuthStatus");
         const token = localStorage.getItem('token');
         if (token) {
           try {
@@ -115,7 +113,6 @@
       
         if (profileMenu) {
           profileMenu.addEventListener('click', e => {
-            console.log("click");
             e.preventDefault();
             if (!localStorage.getItem('token')) {
               const modal = new bootstrap.Modal(document.getElementById('loginModal'));

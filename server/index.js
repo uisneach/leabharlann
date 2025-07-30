@@ -203,6 +203,52 @@ app.get('/node/:id', async (req, res, next) => {
   }
 });
 
+// Update node properties
+app.patch('/node/:id', requireAuth, async (req, res, next) => {
+  const nodeId = parseInt(req.params.id, 10);
+  const properties = req.body;
+  const session = driver.session();
+
+  try {
+    // Validate properties
+    if (!properties || Object.keys(properties).length === 0) {
+      return res.status(400).json({ error: 'At least one property is required' });
+    }
+    for (const key of Object.keys(properties)) {
+      if (/[^a-zA-Z0-9_]/.test(key)) {
+        return res.status(400).json({ error: 'Property names can only contain letters, numbers, or underscores' });
+      }
+    }
+
+    // Update node in Neo4j
+    const result = await session.run(
+      `
+      MATCH (n)
+      WHERE id(n) = $nodeId
+      SET n += $properties
+      RETURN id(n) AS id, labels(n) AS labels, properties(n) AS props
+      `,
+      { nodeId, properties }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'Node not found' });
+    }
+
+    const record = result.records[0];
+    res.json({
+      id: record.get('id').toString(),
+      labels: record.get('labels'),
+      properties: record.get('props')
+    });
+  } catch (err) {
+    console.error('Update Node Error:', err);
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
 // --- CREATE Author ---
 // POST /authors  
 // Body: { name: string, <any other initial properties> }
