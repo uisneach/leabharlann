@@ -225,44 +225,6 @@
     const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
     let propertyCount = 1;
 
-    function updateProfileMenu(username) {
-      const profileMenu = document.getElementById('profileMenu');
-      profileMenu.textContent = username;
-      profileMenu.classList.add('dropdown-toggle');
-      profileMenu.setAttribute('data-bs-toggle', 'dropdown');
-      const navItem = profileMenu.parentElement;
-      const existingDropdown = navItem.querySelector('.dropdown-menu');
-      if (existingDropdown) existingDropdown.remove();
-      const dropdown = document.createElement('ul');
-      dropdown.className = 'dropdown-menu dropdown-menu-end';
-      const logoutItem = document.createElement('li');
-      const logoutLink = document.createElement('a');
-      logoutLink.className = 'dropdown-item';
-      logoutLink.href = '#';
-      logoutLink.textContent = 'Log out';
-      logoutLink.addEventListener('click', e => {
-        e.preventDefault();
-        localStorage.removeItem('token');
-        window.location.href = 'index.html';
-      });
-      logoutItem.appendChild(logoutLink);
-      dropdown.appendChild(logoutItem);
-      navItem.appendChild(dropdown);
-    }
-
-    function checkAuthStatus() {
-      const token = localStorage.getItem('token');
-      if (!token) window.location.href = 'index.html';
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        updateProfileMenu(payload.username || 'User');
-      } catch (e) {
-        console.error('Invalid token:', e);
-        localStorage.removeItem('token');
-        window.location.href = 'index.html';
-      }
-    }
-
     async function loadSourceNode() {
       const urlParams = new URLSearchParams(window.location.search);
       const fromType = urlParams.get('fromType');
@@ -369,7 +331,6 @@
     });
 
     window.addEventListener('DOMContentLoaded', () => {
-      checkAuthStatus();
       loadSourceNode();
     });
   </script>
