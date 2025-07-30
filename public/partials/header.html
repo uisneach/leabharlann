@@ -1,6 +1,6 @@
 <header>
   <nav class="navbar navbar-expand-lg">
-    <a class="navbar-brand" href="home.html">
+    <a class="navbar-brand" href="index.html">
       <img src="https://uisneac.com/images/Gold-Celtic-Design.png" alt="Logo" width="32" height="32" class="d-inline-block align-text-top">
       An Leabharlann Ghealach
     </a>
@@ -39,4 +39,117 @@
       </div>
     </div>
   </div>
+  <script>
+    function updateProfileMenu(username) {
+      console.log("updateProfileMenu");
+      const profileMenu = document.getElementById('profileMenu');
+      if (!profileMenu) return;
+      const navItem = profileMenu.parentElement;
+      profileMenu.textContent = username;
+      profileMenu.classList.add('dropdown-toggle');
+      profileMenu.setAttribute('data-bs-toggle', 'dropdown');
+      const existingDropdown = navItem.querySelector('.dropdown-menu');
+      if (existingDropdown) existingDropdown.remove();
+      const dropdown = document.createElement('ul');
+      dropdown.className = 'dropdown-menu dropdown-menu-end';
+      const logoutItem = document.createElement('li');
+      const logoutLink = document.createElement('a');
+      logoutLink.className = 'dropdown-item';
+      logoutLink.href = '#';
+      logoutLink.textContent = 'Log out';
+      logoutLink.addEventListener('click', e => {
+        e.preventDefault();
+        localStorage.removeItem('token');
+        profileMenu.textContent = 'Account';
+        profileMenu.classList.remove('dropdown-toggle');
+        profileMenu.removeAttribute('data-bs-toggle');
+        navItem.querySelector('.dropdown-menu')?.remove();
+        document.dispatchEvent(new Event('authChange'));
+      });
+      logoutItem.appendChild(logoutLink);
+      dropdown.appendChild(logoutItem);
+      navItem.appendChild(dropdown);
+      document.dispatchEvent(new Event('authChange'));
+    }
+
+    function checkAuthStatus() {
+      console.log("checkAuthStatus");
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          updateProfileMenu(payload.username || 'User');
+        } catch (e) {
+          console.error('Invalid token:', e);
+          localStorage.removeItem('token');
+          document.dispatchEvent(new Event('authChange'));
+        }
+      } else {
+        const profileMenu = document.getElementById('profileMenu');
+        if (profileMenu) {
+          profileMenu.textContent = 'Account';
+          profileMenu.classList.remove('dropdown-toggle');
+          profileMenu.removeAttribute('data-bs-toggle');
+          const navItem = profileMenu.parentElement;
+          navItem.querySelector('.dropdown-menu')?.remove();
+          document.dispatchEvent(new Event('authChange'));
+        }
+      }
+    }
+
+    function attachEventListeners() {
+      const profileMenu = document.getElementById('profileMenu');
+      const loginForm = document.getElementById('loginForm');
+      const searchForm = document.getElementById('search-form');
+    
+      if (profileMenu) {
+        profileMenu.addEventListener('click', e => {
+          console.log("click");
+          e.preventDefault();
+          if (!localStorage.getItem('token')) {
+            const modal = new bootstrap.Modal(document.getElementById('loginModal'));
+            modal.show();
+          }
+        });
+      }
+    
+      if (loginForm) {
+        loginForm.addEventListener('submit', async e => {
+          e.preventDefault();
+          const username = document.getElementById('username').value.trim();
+          const password = document.getElementById('password').value;
+          const errorMessage = document.getElementById('errorMessage');
+          if (!username || !password) {
+            errorMessage.style.display = 'block';
+            errorMessage.textContent = 'Please fill in all fields';
+            return;
+          }
+          try {
+            const response = await fetch(`${API_BASE}/login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username, password })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Login failed');
+            localStorage.setItem('token', data.token);
+            errorMessage.style.display = 'none';
+            bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
+            updateProfileMenu(username);
+          } catch (error) {
+            errorMessage.style.display = 'block';
+            errorMessage.textContent = error.message;
+          }
+        });
+      }
+    
+      if (searchForm) {
+        searchForm.addEventListener('submit', e => {
+          e.preventDefault();
+          const q = document.getElementById('search-input').value.trim();
+          if (q) window.location = `info.html?type=authors&value=${encodeURIComponent(q)}`;
+        });
+      }
+    }
+  </script>
 </header>
