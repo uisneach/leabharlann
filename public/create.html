@@ -8,7 +8,166 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="header-placeholder"></div>
+  <header>
+    <nav class="navbar navbar-expand-lg">
+      <a class="navbar-brand" href="index.html">
+        <img src="https://uisneac.com/images/Gold-Celtic-Design.png" alt="Logo" width="32" height="32" class="d-inline-block align-text-top">
+        An Leabharlann Ghealach
+      </a>
+      <form id="search-form" class="d-flex mx-3" style="flex:1;">
+        <input id="search-input" class="form-control me-2" type="search" placeholder="Search authors, texts, editions…" aria-label="Search">
+        <button class="btn btn-light" type="submit">Search</button>
+      </form>
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" id="profileMenu" role="button">Account</a>
+        </li>
+      </ul>
+    </nav>
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="loginModalLabel">Log In</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="loginForm">
+              <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" required>
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" required>
+              </div>
+              <div id="errorMessage" class="text-danger mb-3" style="display: none;"></div>
+              <button type="submit" class="btn btn-primary">Log In</button>
+              <a href="register.html" class="btn btn-link">Register</a>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      function updateProfileMenu(username) {
+        console.log("updateProfileMenu");
+        const profileMenu = document.getElementById('profileMenu');
+        if (!profileMenu) return;
+        const navItem = profileMenu.parentElement;
+        profileMenu.textContent = username;
+        profileMenu.classList.add('dropdown-toggle');
+        profileMenu.setAttribute('data-bs-toggle', 'dropdown');
+        const existingDropdown = navItem.querySelector('.dropdown-menu');
+        if (existingDropdown) existingDropdown.remove();
+        const dropdown = document.createElement('ul');
+        dropdown.className = 'dropdown-menu dropdown-menu-end';
+        const logoutItem = document.createElement('li');
+        const logoutLink = document.createElement('a');
+        logoutLink.className = 'dropdown-item';
+        logoutLink.href = '#';
+        logoutLink.textContent = 'Log out';
+        logoutLink.addEventListener('click', e => {
+          e.preventDefault();
+          localStorage.removeItem('token');
+          profileMenu.textContent = 'Account';
+          profileMenu.classList.remove('dropdown-toggle');
+          profileMenu.removeAttribute('data-bs-toggle');
+          navItem.querySelector('.dropdown-menu')?.remove();
+          document.dispatchEvent(new Event('authChange'));
+        });
+        logoutItem.appendChild(logoutLink);
+        dropdown.appendChild(logoutItem);
+        navItem.appendChild(dropdown);
+        document.dispatchEvent(new Event('authChange'));
+      }
+
+      function checkAuthStatus() {
+        console.log("checkAuthStatus");
+        const token = localStorage.getItem('token');
+        if (token) {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            updateProfileMenu(payload.username || 'User');
+          } catch (e) {
+            console.error('Invalid token:', e);
+            localStorage.removeItem('token');
+            document.dispatchEvent(new Event('authChange'));
+          }
+        } else {
+          const profileMenu = document.getElementById('profileMenu');
+          if (profileMenu) {
+            profileMenu.textContent = 'Account';
+            profileMenu.classList.remove('dropdown-toggle');
+            profileMenu.removeAttribute('data-bs-toggle');
+            const navItem = profileMenu.parentElement;
+            navItem.querySelector('.dropdown-menu')?.remove();
+            document.dispatchEvent(new Event('authChange'));
+          }
+        }
+      }
+
+      function attachEventListeners() {
+        const profileMenu = document.getElementById('profileMenu');
+        const loginForm = document.getElementById('loginForm');
+        const searchForm = document.getElementById('search-form');
+      
+        if (profileMenu) {
+          profileMenu.addEventListener('click', e => {
+            console.log("click");
+            e.preventDefault();
+            if (!localStorage.getItem('token')) {
+              const modal = new bootstrap.Modal(document.getElementById('loginModal'));
+              modal.show();
+            }
+          });
+        }
+      
+        if (loginForm) {
+          loginForm.addEventListener('submit', async e => {
+            e.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('errorMessage');
+            if (!username || !password) {
+              errorMessage.style.display = 'block';
+              errorMessage.textContent = 'Please fill in all fields';
+              return;
+            }
+            try {
+              const response = await fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+              });
+              const data = await response.json();
+              if (!response.ok) throw new Error(data.error || 'Login failed');
+              localStorage.setItem('token', data.token);
+              errorMessage.style.display = 'none';
+              bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
+              updateProfileMenu(username);
+            } catch (error) {
+              errorMessage.style.display = 'block';
+              errorMessage.textContent = error.message;
+            }
+          });
+        }
+      
+        if (searchForm) {
+          searchForm.addEventListener('submit', e => {
+            e.preventDefault();
+            const q = document.getElementById('search-input').value.trim();
+            if (q) window.location = `info.html?type=authors&value=${encodeURIComponent(q)}`;
+          });
+        }
+      }
+
+      window.addEventListener('DOMContentLoaded', () => {
+        attachEventListeners()
+        checkAuthStatus();
+      });
+    </script>
+  </header>
   <div class="container mt-4">
     <h1>Create <span id="nodeType">Node</span></h1>
     <form id="createForm">
@@ -51,14 +210,6 @@
   <script>
     const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
     let propertyCount = 1;
-
-    async function loadHeader() {
-      const response = await fetch('partials/header.html');
-      document.getElementById('header-placeholder').innerHTML = await response.text();
-      const headerScript = document.createElement('script');
-      headerScript.src = 'partials/header.js';
-      document.head.appendChild(headerScript);
-    }
 
     document.getElementById('addProperty').addEventListener('click', () => {
       const tbody = document.getElementById('properties');
@@ -107,7 +258,6 @@
     });
 
     window.addEventListener('DOMContentLoaded', () => {
-      loadHeader();
       const urlParams = new URLSearchParams(window.location.search);
       const type = urlParams.get('type');
       if (type) document.getElementById('nodeLabel').value = type;
