@@ -348,6 +348,48 @@ app.get('/nodes', async (req, res, next) => {
   }
 });
 
+// --- Get Node by ID ---
+/**
+ * @openapi
+ * /nodes/{id}:
+ *   get:
+ *     summary: Get a node by ID
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Node details
+ *       404:
+ *         description: Node not found
+ */
+app.get('/nodes/:id', async (req, res, next) => {
+  const id = req.params.id;
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      'MATCH (n) WHERE id(n) = $id RETURN n',
+      { id: neo4j.int(id) }
+    );
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+    }
+    const node = result.records[0].get('n');
+    res.json({
+      id: node.identity.toString(),
+      labels: node.labels,
+      properties: node.properties
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
 // --- Create Node ---
 /**
  * @openapi

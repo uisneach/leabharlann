@@ -225,14 +225,14 @@
       try {
         const token = localStorage.getItem('token');
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const nodeRes = await fetch(`${API_BASE}/nodes?id=${encodeURIComponent(id)}`, { headers });
+        const nodeRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(id)}`, { headers });
         if (nodeRes.status === 401) {
           localStorage.removeItem('token');
           window.location.href = 'index.html';
           return;
         }
         if (!nodeRes.ok) throw new Error(`Error ${nodeRes.status}: ${await nodeRes.text()}`);
-        const data = (await nodeRes.json())[0]; // Get first node from array
+        const data = await nodeRes.json();
         if (!data) throw new Error('Node not found');
         nodeId = data.id; // Store node ID for editing
 
@@ -246,6 +246,7 @@
         renderPage(data);
         updateAuthUI();
       } catch (error) {
+        console.error('Load error:', error);
         document.getElementById('page-title').textContent = `Error: ${error.message}`;
       }
     }
@@ -290,7 +291,7 @@
             a.target = '_blank';
             td.appendChild(a);
           } else {
-            td.textContent = v;
+            td.textContent = v || '';
           }
         }
         tr.append(th, td);
