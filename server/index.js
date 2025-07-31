@@ -68,6 +68,14 @@ function requireAuth(req, res, next) {
   }
 }
 
+// --- Admin-Only Middleware ---
+function requireAdmin(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+  }
+  next();
+}
+
 // --- User Registration ---
 /**
  * @openapi
@@ -85,10 +93,6 @@ function requireAuth(req, res, next) {
  *                 type: string
  *               password:
  *                 type: string
- *               role:
- *                 type: string
- *                 enum: [user, admin]
- *                 default: user
  *     responses:
  *       201:
  *         description: User created successfully
@@ -98,9 +102,9 @@ function requireAuth(req, res, next) {
  *         description: Username already exists
  */
 app.post('/register', async (req, res, next) => {
-  const { username, password, role = 'user' } = req.body;
-  if (!username || !password || !['user', 'admin'].includes(role)) {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Username, password, and valid role are required' } });
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Username and password are required' } });
   }
   const session = driver.session();
   try {
@@ -115,9 +119,66 @@ app.post('/register', async (req, res, next) => {
     const passwordHash = await bcrypt.hash(password, salt);
     await session.run(
       'CREATE (u:User {username: $username, passwordHash: $passwordHash, role: $role})',
-      { username, passwordHash, role }
+      { username, passwordHash, role: 'user' }
     );
     res.status(201).json({ message: 'User created successfully' });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Set User Role (Admin Only) ---
+/**
+ * @openapi
+ * /users/{username}/role:
+ *   put:
+ *     summary: Set user role (admin only)
+ *     parameters:
+ *       - name: username
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [user, admin]
+ *     responses:
+ *       200:
+ *         description: User role updated successfully
+ *       400:
+ *         description: Invalid input
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: User not found
+ */
+app.put('/users/:username/role', requireAuth, requireAdmin, async (req, res, next) => {
+  const { username } = req.params;
+  const { role } = req.body;
+  if (!['user', 'admin'].includes(role)) {
+    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Invalid role' } });
+  }
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      'MATCH (u:User {username: $username}) SET u.role = $role RETURN u',
+      { username, role }
+    );
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } });
+    }
+    res.json({ message: 'User role updated successfully' });
   } catch (err) {
     next(err);
   } finally {
@@ -561,6 +622,83 @@ app.post('/relation', requireAuth, async (req, res, next) => {
       type: record.get('type'),
       properties: record.get('props')
     });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Get Node Relationships ---
+/**
+ * @openapi
+ * /nodes/{id}/relations:
+ *   get:
+ *     summary: Get all relationships for a node
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of relationships
+ *       404:
+ *         description: Node not found
+ */
+app.get('/nodes/:id/relations', async (req, res, next) => {
+  const id = req.params.id;
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (n) WHERE id(n) = $id
+      OPTIONAL MATCH (n)-[r]->(m)
+      OPTIONAL MATCH (p)-[r2]->(n)
+      RETURN
+        collect(DISTINCT {
+          relId: id(r),
+          type: type(r),
+          direction: "outgoing",
+          node: { id: id(m), labels: labels(m), properties: properties(m) }
+        }) AS outgoing,
+        collect(DISTINCT {
+          relId: id(r2),
+          type: type(r2),
+          direction: "incoming",
+          node: { id: id(p), labels: labels(p), properties: properties(p) }
+        }) AS incoming
+      `,
+      { id: neo4j.int(id) }
+    );
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+    }
+    const record = result.records[0];
+    const response = {
+      outgoing: record.get('outgoing').filter(r => r.node && r.node.id).map(r => ({
+        id: r.relId.toString(),
+        type: r.type,
+        direction: r.direction,
+        node: {
+          id: r.node.id.toString(),
+          labels: r.node.labels,
+          properties: r.node.properties
+        }
+      })),
+      incoming: record.get('incoming').filter(r => r.node && r.node.id).map(r => ({
+        id: r.relId.toString(),
+        type: r.type,
+        direction: r.direction,
+        node: {
+          id: r.node.id.toString(),
+          labels: r.node.labels,
+          properties: r.node.properties
+        }
+      }))
+    };
+    res.json(response);
   } catch (err) {
     next(err);
   } finally {

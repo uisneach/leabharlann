@@ -210,30 +210,39 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
   <script>
+    const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
     const params = new URLSearchParams(window.location.search);
     const type = params.get('type');
-    const value = params.get('value');
+    const id = params.get('id');
     let nodeId = null;
     let propertyCount = 0;
 
     async function loadInfo() {
-      if (!type || !value) {
+      if (!type || !id) {
         document.getElementById('page-title').textContent = 'Invalid parameters';
         return;
       }
       try {
         const token = localStorage.getItem('token');
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const url = `${API_BASE}/${type}/${encodeURIComponent(value)}?relations=true`;
-        const res = await fetch(url, { headers });
-        if (res.status === 401) {
+        const nodeRes = await fetch(`${API_BASE}/nodes?id=${encodeURIComponent(id)}`, { headers });
+        if (nodeRes.status === 401) {
           localStorage.removeItem('token');
-          window.location.href = 'home.html';
+          window.location.href = 'index.html';
           return;
         }
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        const data = await res.json();
+        if (!nodeRes.ok) throw new Error(`Error ${nodeRes.status}: ${await nodeRes.text()}`);
+        const data = (await nodeRes.json())[0]; // Get first node from array
+        if (!data) throw new Error('Node not found');
         nodeId = data.id; // Store node ID for editing
+
+        // Fetch relationships
+        const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(id)}/relations`, { headers });
+        if (!relRes.ok) throw new Error(`Error ${relRes.status}: ${await relRes.text()}`);
+        const relData = await relRes.json();
+        data.outgoing = relData.outgoing || [];
+        data.incoming = relData.incoming || [];
+
         renderPage(data);
         updateAuthUI();
       } catch (error) {
@@ -248,15 +257,14 @@
     }
 
     function renderPage(data) {
-      const title = data.properties.name || data.properties.title || data.id;
+      const title = data.properties.name || data.properties.title || data.properties.id || data.id;
       document.getElementById('page-title').textContent = title;
-      document.getElementById('createRelationshipBtn').href = `relationship.html?fromType=${encodeURIComponent(type.slice(0, -1))}&fromId=${encodeURIComponent(data.id)}`;
+      document.getElementById('createRelationshipBtn').href = `relationship.html?fromType=${encodeURIComponent(type)}&fromId=${encodeURIComponent(data.id)}`;
       const infoTable = document.getElementById('info-table');
       const propertiesDisplay = document.getElementById('propertiesDisplay');
       infoTable.innerHTML = '';
       propertiesDisplay.innerHTML = '';
       Object.entries(data.properties).forEach(([k, v]) => {
-        // Info table (sidebar)
         const tr = document.createElement('tr');
         const th = document.createElement('th');
         th.textContent = k;
@@ -297,55 +305,54 @@
         const row = document.createElement('tr');
         row.className = 'property-row';
         row.innerHTML = `
-          <td><input type="text" class="form-control" name="prop-name-${propertyCount}" value="${k}" required></td>
-          <td><input type="text" class="form-control" name="prop-value-${propertyCount}" value="${v}" required></td>
+          <td><input type="text" class="form-control" name="prop-name-${propertyCount}" value="${k}" readonly></td>
+          <td><input type="text" class="form-control" name="prop-value-${propertyCount}" value="${v || ''}"></td>
         `;
         propertiesTbody.appendChild(row);
         propertyCount++;
       });
 
-      let outgoing = data.outgoingRels || [];
-      let incoming = data.incomingRels || [];
-      if (data.relations) {
-        outgoing = data.relations.map(r => ({ type: r.type, node: r.target }));
-      }
-
+      // Render relationships
       const outSection = document.getElementById('outgoing-section');
       const outList = document.getElementById('outgoing-list');
-      const validOutgoing = outgoing.filter(r => r.node && r.node.properties && (r.node.properties.name || r.node.properties.title || r.node.id));
-      if (validOutgoing.length) {
+      outList.innerHTML = '';
+      if (data.outgoing.length) {
         outSection.style.display = '';
-        validOutgoing.forEach(r => {
+        data.outgoing.forEach(r => {
           const li = document.createElement('li');
           const a = document.createElement('a');
-          const label = r.node.properties.name || r.node.properties.title || r.node.id;
+          const label = r.node.properties.name || r.node.properties.title || r.node.properties.id || r.node.id;
           a.textContent = `${r.type} → ${label}`;
-          a.href = `info.html?type=${typeFromLabel(r.node.labels)}&value=${encodeURIComponent(label)}`;
+          a.href = `info.html?type=${typeFromLabel(r.node.labels)}&id=${encodeURIComponent(r.node.id)}`;
           li.append(a);
           outList.append(li);
         });
+      } else {
+        outSection.style.display = 'none';
       }
 
       const inSection = document.getElementById('incoming-section');
       const inList = document.getElementById('incoming-list');
-      const validIncoming = incoming.filter(r => r.node && r.node.properties && (r.node.properties.name || r.node.properties.title || r.node.id));
-      if (validIncoming.length) {
+      inList.innerHTML = '';
+      if (data.incoming.length) {
         inSection.style.display = '';
-        validIncoming.forEach(r => {
+        data.incoming.forEach(r => {
           const li = document.createElement('li');
           const a = document.createElement('a');
-          const label = r.node.properties.name || r.node.properties.title || r.node.id;
+          const label = r.node.properties.name || r.node.properties.title || r.node.properties.id || r.node.id;
           a.textContent = `${r.type} ← ${label}`;
-          a.href = `info.html?type=${typeFromLabel(r.node.labels)}&value=${encodeURIComponent(label)}`;
+          a.href = `info.html?type=${typeFromLabel(r.node.labels)}&id=${encodeURIComponent(r.node.id)}`;
           li.append(a);
           inList.append(li);
         });
+      } else {
+        inSection.style.display = 'none';
       }
     }
 
     function typeFromLabel(labels) {
-      if (!labels || !labels.length) return type;
-      return labels[0].toLowerCase() + 's';
+      if (!labels || !labels.length) return type || 'node';
+      return labels[0].toLowerCase();
     }
 
     function isUrl(s) {
@@ -374,8 +381,8 @@
       const row = document.createElement('tr');
       row.className = 'property-row';
       row.innerHTML = `
-        <td><input type="text" class="form-control" name="prop-name-${propertyCount}" placeholder="e.g., name, title" required></td>
-        <td><input type="text" class="form-control" name="prop-value-${propertyCount}" required></td>
+        <td><input type="text" class="form-control" name="prop-name-${propertyCount}" placeholder="e.g., name, title"></td>
+        <td><input type="text" class="form-control" name="prop-value-${propertyCount}"></td>
       `;
       tbody.appendChild(row);
       propertyCount++;
@@ -388,12 +395,12 @@
       document.querySelectorAll('.property-row').forEach((row, index) => {
         const name = row.querySelector(`[name="prop-name-${index}"]`).value.trim();
         const value = row.querySelector(`[name="prop-value-${index}"]`).value.trim();
-        if (name && value) {
+        if (name) {
           if (/[^a-zA-Z0-9_]/.test(name)) {
             invalidProp = true;
             return;
           }
-          properties[name] = value;
+          properties[name] = value || null;
         }
       });
       if (invalidProp) {
@@ -401,32 +408,35 @@
         document.getElementById('updateErrorMessage').textContent = 'Property names can only contain letters, numbers, or underscores';
         return;
       }
-      if (Object.keys(properties).length === 0) {
-        document.getElementById('updateErrorMessage').style.display = 'block';
-        document.getElementById('updateErrorMessage').textContent = 'At least one property is required';
-        return;
-      }
       try {
         const token = localStorage.getItem('token');
         if (!token) {
-          window.location.href = 'home.html';
+          window.location.href = 'index.html';
           return;
         }
-        const response = await fetch(`${API_BASE}/node/${nodeId}`, {
-          method: 'PATCH',
+        const response = await fetch(`${API_BASE}/nodes/${nodeId}`, {
+          method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(properties)
+          body: JSON.stringify({ properties })
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Failed to update node');
+        if (!response.ok) throw new Error(data.error.message || 'Failed to update node');
         document.getElementById('updateErrorMessage').style.display = 'none';
         document.getElementById('editPropertiesForm').style.display = 'none';
         document.getElementById('editPropertiesBtn').style.display = 'block';
         document.getElementById('propertiesDisplay').style.display = 'block';
-        renderPage(data); // Refresh page with updated data
+
+        // Fetch updated relationships
+        const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!relRes.ok) throw new Error(`Error ${relRes.status}: ${await relRes.text()}`);
+        const relData = await relRes.json();
+        data.outgoing = relData.outgoing || [];
+        data.incoming = relData.incoming || [];
+
+        renderPage(data);
       } catch (error) {
         document.getElementById('updateErrorMessage').style.display = 'block';
         document.getElementById('updateErrorMessage').textContent = error.message;

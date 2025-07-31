@@ -201,32 +201,32 @@
     items.forEach(item => {
       const li = document.createElement('li');
       const a = document.createElement('a');
-      const label = item.properties[labelKey] || item.id;
+      const label = item.properties[labelKey] || item.properties.id || item.id;
       a.textContent = label;
-      a.href = `info.html?type=${encodeURIComponent(type)}&value=${encodeURIComponent(label)}`;
+      a.href = `info.html?type=${encodeURIComponent(type)}&id=${encodeURIComponent(item.id)}`;
       li.appendChild(a);
       ul.appendChild(li);
     });
   }
 
-  async function fetchAll(type) {
+  async function fetchNodesByLabel(label, property) {
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-    const res = await fetch(`${API_BASE}/${type}`, { headers });
-    if (!res.ok) throw new Error(`Failed to load ${type}`);
+    const res = await fetch(`${API_BASE}/nodes?label=${encodeURIComponent(label)}`, { headers });
+    if (!res.ok) throw new Error(`Failed to load ${label} nodes`);
     return res.json();
   }
 
   async function loadHome() {
     try {
       const [authors, texts, editions] = await Promise.all([
-        fetchAll('authors'),
-        fetchAll('texts'),
-        fetchAll('editions')
+        fetchNodesByLabel('Author', 'name'),
+        fetchNodesByLabel('Text', 'title'),
+        fetchNodesByLabel('Edition', 'title')
       ]);
-      populateList('authors-list', authors, 'authors', 'name');
-      populateList('texts-list', texts, 'texts', 'title');
-      populateList('editions-list', editions, 'editions', 'title');
+      populateList('authors-list', authors, 'Author', 'name');
+      populateList('texts-list', texts, 'Text', 'title');
+      populateList('editions-list', editions, 'Edition', 'title');
       updateAuthUI();
     } catch (err) {
       console.error('Load error:', err);
