@@ -268,7 +268,7 @@
       });
     }
 
-    function renderPage(data) {
+     function renderPage(data) {
       const title = data.properties.name || data.properties.title || data.properties.nodeId || data.id;
       document.getElementById('page-title').textContent = title;
       document.getElementById('createRelationshipBtn').href = `relationship.html?fromType=${encodeURIComponent(type)}&fromId=${encodeURIComponent(data.id)}`;
@@ -352,8 +352,10 @@
           const deleteBtn = document.createElement('button');
           deleteBtn.className = 'btn btn-danger btn-sm delete-rel-btn ms-2';
           deleteBtn.textContent = 'Delete';
-          deleteBtn.dataset.relId = r.id;
-          deleteBtn.addEventListener('click', () => deleteRelationship(r.id));
+          deleteBtn.dataset.sourceNodeId = data.id;
+          deleteBtn.dataset.targetNodeId = r.node.id;
+          deleteBtn.dataset.relType = r.type;
+          deleteBtn.addEventListener('click', () => deleteRelationship(data.id, r.node.id, r.type));
           li.appendChild(deleteBtn);
           outList.appendChild(li);
         });
@@ -376,11 +378,10 @@
           const deleteBtn = document.createElement('button');
           deleteBtn.className = 'btn btn-danger btn-sm delete-rel-btn ms-2';
           deleteBtn.textContent = 'Delete';
-          deleteBtn.dataset.relId = r.id; 
-          console.log(r);
-          console.log(r.id);
-          console.log(data);
-          deleteBtn.addEventListener('click', () => deleteRelationship(r.id));
+          deleteBtn.dataset.sourceNodeId = r.node.id;
+          deleteBtn.dataset.targetNodeId = data.id;
+          deleteBtn.dataset.relType = r.type;
+          deleteBtn.addEventListener('click', () => deleteRelationship(r.node.id, data.id, r.type));
           li.appendChild(deleteBtn);
           inList.appendChild(li);
         });
@@ -432,14 +433,18 @@
       }
     }
 
-    async function deleteRelationship(relId) {
+    async function deleteRelationship(sourceNodeId, targetNodeId, relType) {
       if (!confirm('Are you sure you want to delete this relationship?')) return;
       try {
         const token = localStorage.getItem('token');
         if (!token) throw new Error('Not authenticated');
-        const response = await fetch(`${API_BASE}/relation/${encodeURIComponent(relId)}`, {
+        const response = await fetch(`${API_BASE}/relation`, {
           method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ sourceNodeId, targetNodeId, relType })
         });
         if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete relationship');
         // Reload node data
@@ -466,6 +471,7 @@
       if (!labels || !labels.length) return type || 'node';
       return labels.find(label => label !== 'Entity') || 'node';
     }
+
 
     function isUrl(s) {
       try {
@@ -551,13 +557,13 @@
         const relData = await relRes.json();
         data.outgoing = relData.outgoing || [];
         data.incoming = relData.incoming || [];
-
         renderPage(data);
       } catch (error) {
         document.getElementById('updateErrorMessage').style.display = 'block';
         document.getElementById('updateErrorMessage').textContent = error.message;
       }
     });
+
 
     window.addEventListener('DOMContentLoaded', () => {
       loadInfo();

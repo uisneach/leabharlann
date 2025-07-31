@@ -820,45 +820,83 @@ app.get('/nodes/:id/relations', async (req, res, next) => {
 // --- Delete Relationship ---
 /**
  * @openapi
- * /relation/{id}:
+ * /relation:
  *   delete:
- *     summary: Delete a relationship by ID
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Internal Neo4j ID of the relationship
+ *     summary: Delete a relationship by specifying source node, target node, and relationship type
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - sourceNodeId
+ *               - targetNodeId
+ *               - relType
+ *             properties:
+ *               sourceNodeId:
+ *                 type: string
+ *                 description: Unique identifier of the source node
+ *               targetNodeId:
+ *                 type: string
+ *                 description: Unique identifier of the target node
+ *               relType:
+ *                 type: string
+ *                 description: Type/label of the relationship
  *     responses:
  *       204:
  *         description: Relationship deleted successfully
+ *       400:
+ *         description: Invalid request body
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Forbidden
  *       404:
- *         description: Relationship not found
+ *         description: Relationship or nodes not found
  */
-app.delete('/relation/:id', requireAuth, async (req, res, next) => {
-  const { id: relId } = req.params;
+app.delete('/relation', requireAuth, async (req, res, next) => {
+  const { sourceNodeId, targetNodeId, relType } = req.body;
+
+  // Validate input
+  if (!sourceNodeId || !targetNodeId || !relType) {
+    return res.status(400).json({ 
+      error: { 
+        code: 'INVALID_INPUT', 
+        message: 'sourceNodeId, targetNodeId, and relType are required' 
+      }
+    });
+  }
+
   const session = driver.session();
   try {
     const checkResult = await session.run(
-      'MATCH ()-[r]->() WHERE id(r) = $relId RETURN r.createdBy AS createdBy',
-      { relId: neo4j.int(relId) }
+      `MATCH (a)-[r:${relType}]->(b)
+       WHERE a.nodeId = $sourceNodeId AND b.nodeId = $targetNodeId
+       RETURN r.createdBy AS createdBy, r`,
+      { sourceNodeId, targetNodeId }
     );
+
     if (checkResult.records.length === 0) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Relationship not found' } });
+      return res.status(404).json({ 
+        error: { code: 'NOT_FOUND', message: 'Relationship or nodes not found' } 
+      });
     }
+
     const createdBy = checkResult.records[0].get('createdBy');
     if (req.user.role !== 'admin' && createdBy !== req.user.username) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only delete relationships you created' } });
+      return res.status(403).json({ 
+        error: { code: 'FORBIDDEN', message: 'You can only delete relationships you created' } 
+      });
     }
+
     await session.run(
-      'MATCH ()-[r]->() WHERE id(r) = $relId DELETE r',
-      { relId: neo4j.int(relId) }
+      `MATCH (a)-[r:${relType}]->(b)
+       WHERE a.nodeId = $sourceNodeId AND b.nodeId = $targetNodeId
+       DELETE r`,
+      { sourceNodeId, targetNodeId }
     );
+
     res.status(204).send();
   } catch (err) {
     next(err);
