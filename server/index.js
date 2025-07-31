@@ -329,14 +329,17 @@ app.get('/nodes', async (req, res, next) => {
   }
   const session = driver.session();
   try {
-    const cypher = label ?
-      `MATCH (n:\`${label}\`) RETURN n SKIP $offset LIMIT $limit` :
-      `MATCH (n) RETURN n SKIP $offset LIMIT $limit`;
+    const cypher = label
+      ? `MATCH (n:Entity:\`${label}\`) RETURN n SKIP $offset LIMIT $limit`
+      : `MATCH (n:Entity) RETURN n SKIP $offset LIMIT $limit`;
     const result = await session.run(cypher, { offset: neo4j.int(offset), limit: neo4j.int(limit) });
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: `No nodes found${label ? ` with label ${label}` : ''}` } });
+    }
     const nodes = result.records.map(record => {
       const node = record.get('n');
       return {
-        id: node.identity.toString(),
+        id: node.properties.nodeId,
         labels: node.labels,
         properties: node.properties
       };
