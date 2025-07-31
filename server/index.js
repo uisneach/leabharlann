@@ -543,15 +543,16 @@ app.put('/nodes/:id', requireAuth, async (req, res, next) => {
  * @openapi
  * /nodes/{id}:
  *   delete:
- *     summary: Delete a node
+ *     summary: Delete a node by nodeId
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
+ *         description: Custom nodeId of the node
  *     responses:
- *       200:
+ *       204:
  *         description: Node deleted successfully
  *       401:
  *         description: Unauthorized
@@ -561,12 +562,12 @@ app.put('/nodes/:id', requireAuth, async (req, res, next) => {
  *         description: Node not found
  */
 app.delete('/nodes/:id', requireAuth, async (req, res, next) => {
-  const id = req.params.id;
+  const { id: nodeId } = req.params;
   const session = driver.session();
   try {
     const checkResult = await session.run(
-      'MATCH (n) WHERE id(n) = $id RETURN n.createdBy AS createdBy',
-      { id: neo4j.int(id) }
+      'MATCH (n:Entity {nodeId: $nodeId}) RETURN n.createdBy AS createdBy',
+      { nodeId }
     );
     if (checkResult.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
@@ -575,14 +576,85 @@ app.delete('/nodes/:id', requireAuth, async (req, res, next) => {
     if (req.user.role !== 'admin' && createdBy !== req.user.username) {
       return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only delete nodes you created' } });
     }
-    const result = await session.run(
-      'MATCH (n) WHERE id(n) = $id DETACH DELETE n',
-      { id: neo4j.int(id) }
+    await session.run(
+      'MATCH (n:Entity {nodeId: $nodeId}) DETACH DELETE n',
+      { nodeId }
     );
-    if (result.summary.counters.updates().nodesDeleted === 0) {
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Delete Property of Node ---
+/**
+ * @openapi
+ * /nodes/{id}/property/{key}:
+ *   delete:
+ *     summary: Delete a property from a node
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Custom nodeId of the node
+ *       - in: path
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Property key to delete
+ *     responses:
+ *       200:
+ *         description: Property deleted successfully
+ *       400:
+ *         description: Invalid input or protected property
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Node or property not found
+ */
+app.delete('/nodes/:id/property/:key', requireAuth, async (req, res, next) => {
+  const { id: nodeId, key } = req.params;
+  if (!validIdentifier(key)) {
+    return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: 'Invalid property key format' } });
+  }
+  if (key === 'nodeId' || key === 'createdBy') {
+    return res.status(400).json({ error: { code: 'PROTECTED_PROPERTY', message: 'Cannot delete nodeId or createdBy' } });
+  }
+  const session = driver.session();
+  try {
+    const checkResult = await session.run(
+      'MATCH (n:Entity {nodeId: $nodeId}) RETURN n.createdBy AS createdBy, EXISTS(n.`${key}`) AS hasProperty',
+      { nodeId }
+    );
+    if (checkResult.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
     }
-    res.json({ message: 'Node deleted successfully' });
+    const record = checkResult.records[0];
+    const createdBy = record.get('createdBy');
+    const hasProperty = record.get('hasProperty');
+    if (!hasProperty) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: `Property ${key} not found on node` } });
+    }
+    if (req.user.role !== 'admin' && createdBy !== req.user.username) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only delete properties from nodes you created' } });
+    }
+    const result = await session.run(
+      `MATCH (n:Entity {nodeId: $nodeId}) REMOVE n.\`${key}\` RETURN n`,
+      { nodeId }
+    );
+    const node = result.records[0].get('n');
+    res.json({
+      id: node.properties.nodeId,
+      labels: node.labels,
+      properties: node.properties
+    });
   } catch (err) {
     next(err);
   } finally {
@@ -642,14 +714,10 @@ app.post('/relation', requireAuth, async (req, res, next) => {
   }
   const session = driver.session();
   try {
-    console.log("Trying to find source node in relations...");
-    console.log("From Label: " + fromLabel);
-    console.log("From ID: " + fromId);
     const checkResult = await session.run(
       `MATCH (a:Entity:${fromLabel} { nodeId: $fromId }) RETURN a.createdBy AS createdBy`,
       { fromId }
     );
-    console.log(checkResult);
     if (checkResult.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Source node not found' } });
     }
@@ -730,6 +798,130 @@ app.get('/nodes/:id/relations', async (req, res, next) => {
     res.json({
       outgoing: record.get('outgoing').filter(rel => rel.type), // Filter out null relationships
       incoming: record.get('incoming').filter(rel => rel.type)
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Delete Relationship ---
+/**
+ * @openapi
+ * /relation/{id}:
+ *   delete:
+ *     summary: Delete a relationship by ID
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Internal Neo4j ID of the relationship
+ *     responses:
+ *       204:
+ *         description: Relationship deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Relationship not found
+ */
+app.delete('/relation/:id', requireAuth, async (req, res, next) => {
+  const { id: relId } = req.params;
+  const session = driver.session();
+  try {
+    const checkResult = await session.run(
+      'MATCH ()-[r]->() WHERE id(r) = $relId RETURN r.createdBy AS createdBy',
+      { relId: neo4j.int(relId) }
+    );
+    if (checkResult.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Relationship not found' } });
+    }
+    const createdBy = checkResult.records[0].get('createdBy');
+    if (req.user.role !== 'admin' && createdBy !== req.user.username) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only delete relationships you created' } });
+    }
+    await session.run(
+      'MATCH ()-[r]->() WHERE id(r) = $relId DELETE r',
+      { relId: neo4j.int(relId) }
+    );
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Delete Property of Relationship ---
+/**
+ * @openapi
+ * /relation/{id}/property/{key}:
+ *   delete:
+ *     summary: Delete a property from a relationship
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Internal Neo4j ID of the relationship
+ *       - in: path
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Property key to delete
+ *     responses:
+ *       200:
+ *         description: Property deleted successfully
+ *       400:
+ *         description: Invalid input or protected property
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Relationship or property not found
+ */
+app.delete('/relation/:id/property/:key', requireAuth, async (req, res, next) => {
+  const { id: relId, key } = req.params;
+  if (!validIdentifier(key)) {
+    return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: 'Invalid property key format' } });
+  }
+  if (key === 'createdBy') {
+    return res.status(400).json({ error: { code: 'PROTECTED_PROPERTY', message: 'Cannot delete createdBy' } });
+  }
+  const session = driver.session();
+  try {
+    const checkResult = await session.run(
+      'MATCH ()-[r]->() WHERE id(r) = $relId RETURN r.createdBy AS createdBy, EXISTS(r.`${key}`) AS hasProperty',
+      { relId: neo4j.int(relId) }
+    );
+    if (checkResult.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Relationship not found' } });
+    }
+    const record = checkResult.records[0];
+    const createdBy = record.get('createdBy');
+    const hasProperty = record.get('hasProperty');
+    if (!hasProperty) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: `Property ${key} not found on relationship` } });
+    }
+    if (req.user.role !== 'admin' && createdBy !== req.user.username) {
+      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only delete properties from relationships you created' } });
+    }
+    const result = await session.run(
+      `MATCH ()-[r]->() WHERE id(r) = $relId REMOVE r.\`${key}\` RETURN id(r) AS relId, type(r) AS type, properties(r) AS props`,
+      { relId: neo4j.int(relId) }
+    );
+    const record = result.records[0];
+    res.json({
+      id: record.get('relId').toString(),
+      type: record.get('type'),
+      properties: record.get('props')
     });
   } catch (err) {
     next(err);

@@ -39,7 +39,7 @@
               </div>
               <div class="mb-3">
                 <label for="password" class="form-label">Password</label>
-                <input type="password" class="form-control" id="password" required>
+                <input type="text" class="form-control" id="password" required>
               </div>
               <div id="errorMessage" class="text-danger mb-3" style="display: none;"></div>
               <button type="submit" class="btn btn-primary">Log In</button>
@@ -213,8 +213,20 @@
         <input type="text" class="form-control" id="toLabel" placeholder="e.g., Text" required>
       </div>
       <div class="mb-3">
+        <label for="toProperty" class="form-label">Search Property</label>
+        <select class="form-select" id="toProperty" required>
+          <option value="" disabled selected>Select a property</option>
+          <option value="name">Name</option>
+          <option value="title">Title</option>
+          <option value="nodeId">Node ID</option>
+        </select>
+      </div>
+      <div class="mb-3">
         <label for="toNodeSearch" class="form-label">Search Target Node</label>
-        <input type="text" class="form-control" id="toNodeSearch" placeholder="Enter name or title" required>
+        <div class="input-group">
+          <input type="text" class="form-control" id="toNodeSearch" placeholder="Enter search value" required>
+          <span id="nodeStatus" class="input-group-text"></span>
+        </div>
         <ul id="searchResults" class="list-group mt-2" style="display: none;"></ul>
         <input type="hidden" id="toId" required>
       </div>
@@ -241,7 +253,7 @@
         <button type="button" class="btn btn-secondary mb-3" id="addProperty">Add Property</button>
       </div>
       <div id="errorMessage" class="text-danger mb-3" style="display: none;"></div>
-      <button type="submit" class="btn btn-primary">Create Relationship</button>
+      <button type="submit" class="btn btn-primary" id="submitButton" disabled>Create Relationship</button>
       <a href="index.html" class="btn btn-link">Cancel</a>
     </form>
   </div>
@@ -249,6 +261,7 @@
   <script>
     const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
     let propertyCount = 1;
+    let isNodeValid = false;
 
     async function loadSourceNode() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -273,25 +286,58 @@
         if (!data) throw new Error('Node not found');
         document.getElementById('fromType').textContent = fromType;
         document.getElementById('fromId').textContent = data.id;
-        document.getElementById('fromName').textContent = data.properties.name || data.properties.title || data.id;
+        document.getElementById('fromName').textContent = data.properties.name || data.properties.title || data.properties.nodeId || data.id;
       } catch (error) {
         document.querySelector('.container').innerHTML = `<p class="text-danger">Error loading source node: ${error.message}</p>`;
+      }
+    }
+
+    async function validateTargetNode(nodeId, label) {
+      if (!nodeId || !label) {
+        isNodeValid = false;
+        document.getElementById('nodeStatus').textContent = '';
+        document.getElementById('submitButton').disabled = true;
+        return false;
+      }
+      try {
+        const token = localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const response = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}`, { headers });
+        if (!response.ok) throw new Error('Node not found');
+        const node = await response.json();
+        // Verify the node has the specified label (excluding Entity)
+        const hasLabel = node.labels.includes(label);
+        isNodeValid = hasLabel;
+        document.getElementById('nodeStatus').textContent = hasLabel ? '✔' : '✘';
+        document.getElementById('nodeStatus').className = `input-group-text ${hasLabel ? 'text-success' : 'text-danger'}`;
+        document.getElementById('submitButton').disabled = !hasLabel;
+        return hasLabel;
+      } catch (error) {
+        isNodeValid = false;
+        document.getElementById('nodeStatus').textContent = '✘';
+        document.getElementById('nodeStatus').className = 'input-group-text text-danger';
+        document.getElementById('submitButton').disabled = true;
+        return false;
       }
     }
 
     document.getElementById('toNodeSearch').addEventListener('input', async e => {
       const query = e.target.value.trim();
       const toLabel = document.getElementById('toLabel').value.trim();
+      const toProperty = document.getElementById('toProperty').value;
       const resultsList = document.getElementById('searchResults');
       resultsList.innerHTML = '';
       resultsList.style.display = 'none';
-      if (query.length < 2 || !toLabel) return;
+      document.getElementById('toId').value = '';
+      isNodeValid = false;
+      document.getElementById('nodeStatus').textContent = '';
+      document.getElementById('submitButton').disabled = true;
+      if (query.length < 2 || !toLabel || !toProperty) return;
       try {
         const token = localStorage.getItem('token');
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const property = toLabel === 'Author' ? 'name' : 'title';
         const response = await fetch(
-          `${API_BASE}/search?label=${encodeURIComponent(toLabel)}&property=${encodeURIComponent(property)}&value=${encodeURIComponent(query)}`,
+          `${API_BASE}/search?label=${encodeURIComponent(toLabel)}&property=${encodeURIComponent(toProperty)}&value=${encodeURIComponent(query)}`,
           { headers }
         );
         if (!response.ok) throw new Error('Search failed');
@@ -300,12 +346,13 @@
           nodes.forEach(node => {
             const li = document.createElement('li');
             li.className = 'list-group-item list-group-item-action';
-            li.textContent = node.properties.name || node.properties.title || node.id;
-            li.addEventListener('click', () => {
+            li.textContent = node.properties[toProperty] || node.properties.nodeId || node.id;
+            li.addEventListener('click', async () => {
               document.getElementById('toId').value = node.id;
               document.getElementById('toNodeSearch').value = li.textContent;
               resultsList.innerHTML = '';
               resultsList.style.display = 'none';
+              await validateTargetNode(node.id, toLabel);
             });
             resultsList.appendChild(li);
           });
@@ -316,6 +363,32 @@
         document.getElementById('errorMessage').style.display = 'block';
         document.getElementById('errorMessage').textContent = 'Search failed: ' + error.message;
       }
+    });
+
+    document.getElementById('toLabel').addEventListener('input', () => {
+      document.getElementById('toNodeSearch').value = '';
+      document.getElementById('toId').value = '';
+      document.getElementById('searchResults').innerHTML = '';
+      document.getElementById('searchResults').style.display = 'none';
+      isNodeValid = false;
+      document.getElementById('nodeStatus').textContent = '';
+      document.getElementById('submitButton').disabled = true;
+    });
+
+    document.getElementById('toProperty').addEventListener('change', () => {
+      document.getElementById('toNodeSearch').value = '';
+      document.getElementById('toId').value = '';
+      document.getElementById('searchResults').innerHTML = '';
+      document.getElementById('searchResults').style.display = 'none';
+      isNodeValid = false;
+      document.getElementById('nodeStatus').textContent = '';
+      document.getElementById('submitButton').disabled = true;
+    });
+
+    document.getElementById('toId').addEventListener('change', async () => {
+      const toId = document.getElementById('toId').value.trim();
+      const toLabel = document.getElementById('toLabel').value.trim();
+      await validateTargetNode(toId, toLabel);
     });
 
     document.getElementById('addProperty').addEventListener('click', () => {
@@ -331,7 +404,6 @@
     });
 
     document.getElementById('createRelationshipForm').addEventListener('submit', async e => {
-      console.log("submit");
       e.preventDefault();
       const errorMessage = document.getElementById('errorMessage');
       errorMessage.style.display = 'none';
@@ -367,6 +439,11 @@
       if (invalidProp) {
         errorMessage.style.display = 'block';
         errorMessage.textContent = 'Property names must contain only letters, numbers, or underscores';
+        return;
+      }
+      if (!isNodeValid) {
+        errorMessage.style.display = 'block';
+        errorMessage.textContent = 'Please select a valid target node';
         return;
       }
       try {
