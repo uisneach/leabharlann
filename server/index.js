@@ -888,47 +888,80 @@ app.delete('/relation/:id', requireAuth, async (req, res, next) => {
  *         description: Relationship or property not found
  */
 app.delete('/relation/:id/property/:key', requireAuth, async (req, res, next) => {
-  const { id: relId, key } = req.params;
-  if (!validIdentifier(key)) {
-    return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: 'Invalid property key format' } });
-  }
-  if (key === 'createdBy') {
-    return res.status(400).json({ error: { code: 'PROTECTED_PROPERTY', message: 'Cannot delete createdBy' } });
-  }
-  const session = driver.session();
-  try {
-    const checkResult = await session.run(
-      'MATCH ()-[r]->() WHERE id(r) = $relId RETURN r.createdBy AS createdBy, EXISTS(r.`${key}`) AS hasProperty',
-      { relId: neo4j.int(relId) }
-    );
-    if (checkResult.records.length === 0) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Relationship not found' } });
+    const { id: relIdParam, key } = req.params;
+    if (!validIdentifier(key)) {
+      return res.status(400).json({
+          error: {
+            code: 'INVALID_PROPERTY',
+            message: 'Invalid property key format'
+          }
+        });
     }
-    const record = checkResult.records[0];
-    const createdBy = record.get('createdBy');
-    const hasProperty = record.get('hasProperty');
-    if (!hasProperty) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: `Property ${key} not found on relationship` } });
+    if (key === 'createdBy') {
+      return res.status(400).json({
+          error: {
+            code: 'PROTECTED_PROPERTY',
+            message: 'Cannot delete createdBy'
+          }
+        });
     }
-    if (req.user.role !== 'admin' && createdBy !== req.user.username) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only delete properties from relationships you created' } });
+    const session = driver.session();
+    try {
+      const checkCypher = `MATCH ()-[r]->() WHERE id(r) = $relId RETURN r.createdBy AS createdBy, (r.\`${key}\` IS NOT NULL) AS hasProperty`;
+      const checkResult = await session.run(checkCypher, {
+        relId: neo4j.int(relIdParam)
+      });
+
+      if (checkResult.records.length === 0) {
+        return res.status(404).json({
+            error: {
+              code: 'NOT_FOUND',
+              message: 'Relationship not found'
+            }
+          });
+      }
+
+      const checkRecord = checkResult.records[0];
+      const createdBy   = checkRecord.get('createdBy');
+      const hasProperty = checkRecord.get('hasProperty');
+
+      if (!hasProperty) {
+        return res.status(404).json({
+            error: {
+              code: 'NOT_FOUND',
+              message: `Property "${key}" not found on relationship`
+            }
+          });
+      }
+
+      if (req.user.role !== 'admin' && createdBy !== req.user.username) {
+        return res.status(403).json({
+            error: {
+              code: 'FORBIDDEN',
+              message: 'You can only delete properties from relationships you created'
+            }
+          });
+      }
+
+      const deleteCypher = `MATCH ()-[r]->() WHERE id(r) = $relId REMOVE r.\`${key}\` RETURN id(r) AS relId, type(r) AS type, properties(r) AS props`;
+      const deleteResult = await session.run(deleteCypher, {
+        relId: neo4j.int(relIdParam)
+      });
+
+      const deleteRecord = deleteResult.records[0];
+      res.json({
+        id:         deleteRecord.get('relId').toString(),
+        type:       deleteRecord.get('type'),
+        properties: deleteRecord.get('props')
+      });
+    } catch (err) {
+      next(err);
+    } finally {
+      await session.close();
     }
-    const result = await session.run(
-      `MATCH ()-[r]->() WHERE id(r) = $relId REMOVE r.\`${key}\` RETURN id(r) AS relId, type(r) AS type, properties(r) AS props`,
-      { relId: neo4j.int(relId) }
-    );
-    const record = result.records[0];
-    res.json({
-      id: record.get('relId').toString(),
-      type: record.get('type'),
-      properties: record.get('props')
-    });
-  } catch (err) {
-    next(err);
-  } finally {
-    await session.close();
   }
-});
+);
+
 
 // --- Search Nodes ---
 /**
