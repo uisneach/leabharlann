@@ -438,15 +438,13 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
   try {
     const nodeId = uuidv4(); // Generate custom UUID for nodeId
     const allLabels = ['Entity', ...labels]; // Always include Entity label
-        const result = await session.run(
-      `
-      CREATE (n:Node ${allLabels.map(label => `:${label}`).join('')})
+    const result = await session.run(
+      `CREATE (n${allLabels.map(label => `:${label}`).join('')})
       SET n += $properties
-      SET n.id = $customId
+      SET n.id = $nodeId
       SET n.createdBy = $username
-      RETURN n, id(n) AS internalId
-      `,
-      { properties, customId, username: req.user.username }
+      RETURN n, id(n) AS internalId`,
+      { properties, nodeId, username: req.user.username }
     );
     const node = result.records[0].get('n');
     res.status(201).json({
