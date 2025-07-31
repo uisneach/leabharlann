@@ -222,15 +222,11 @@ app.post('/login', async (req, res, next) => {
       'MATCH (u:User {username: $username}) RETURN u',
       { username }
     );
-    console.log("Logging in " + username);
     if (result.records.length === 0) {
       return res.status(401).json({ error: { code: 'INVALID_CREDENTIALS', message: 'Invalid username or password' } });
     }
-    console.log("submitted password: " + password);
     const user = result.records[0].get('u').properties;
-    console.log("hashed password: " + user.passwordHash);
     const isValid = await bcrypt.compare(password, user.passwordHash);
-    console.log(isValid);
     if (!isValid) {
       return res.status(401).json({ error: { code: 'INVALID_CREDENTIALS', message: 'Invalid username or password' } });
     }
@@ -638,8 +634,8 @@ app.post('/relation', requireAuth, async (req, res, next) => {
   const session = driver.session();
   try {
     const checkResult = await session.run(
-      'MATCH (a:\`${fromLabel}\` {id: $fromId}) RETURN a.createdBy AS createdBy',
-      { fromId }
+      'MATCH (a:\`${fromLabel}\`) WHERE id(a) = $fromId RETURN a.createdBy AS createdBy',
+      { fromId: neo4j.int(fromId) }
     );
     if (checkResult.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Source node not found' } });
@@ -650,14 +646,14 @@ app.post('/relation', requireAuth, async (req, res, next) => {
     }
     const result = await session.run(
       `
-      MATCH (a:\`${fromLabel}\` {id: $fromId})
-      MATCH (b:\`${toLabel}\` {id: $toId})
+      MATCH (a:\`${fromLabel}\`) WHERE id(a) = $fromId
+      MATCH (b:\`${toLabel}\`) WHERE id(b) = $toId
       CREATE (a)-[r:\`${relType}\`]->(b)
       SET r += $relProps
       SET r.createdBy = $username
       RETURN id(r) AS relId, type(r) AS type, properties(r) AS props
       `,
-      { fromId, toId, relProps: { ...relProps, createdBy: req.user.username }, username: req.user.username }
+      { fromId: neo4j.int(fromId), toId: neo4j.int(toId), relProps: { ...relProps, createdBy: req.user.username }, username: req.user.username }
     );
     if (result.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Target node not found' } });
