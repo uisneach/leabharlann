@@ -441,7 +441,7 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
     const result = await session.run(
       `CREATE (n${allLabels.map(label => `:${label}`).join('')})
       SET n += $properties
-      SET n.id = $nodeId
+      SET n.nodeId = $nodeId
       SET n.createdBy = $username
       RETURN n, id(n) AS internalId`,
       { properties, nodeId, username: req.user.username }
