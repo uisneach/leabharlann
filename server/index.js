@@ -646,9 +646,10 @@ app.post('/relation', requireAuth, async (req, res, next) => {
     console.log("From Label: " + fromLabel);
     console.log("From ID: " + fromId);
     const checkResult = await session.run(
-      'MATCH (a:Entity:\`${fromLabel}\` {nodeId: $fromId}) RETURN a.createdBy AS createdBy',
+      `MATCH (a:Entity:${fromLabel} { nodeId: $fromId }) RETURN a.createdBy AS createdBy`,
       { fromId }
     );
+    console.log(checkResult);
     if (checkResult.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Source node not found' } });
     }
