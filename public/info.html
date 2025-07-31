@@ -219,6 +219,7 @@
     async function loadInfo() {
       if (!type || !id) {
         document.getElementById('page-title').textContent = 'Invalid parameters';
+        document.getElementById('content').innerHTML = '<p class="text-danger">Missing type or ID</p>';
         return;
       }
       try {
@@ -227,17 +228,18 @@
         const nodeRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(id)}`, { headers });
         if (nodeRes.status === 401) {
           localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
           window.location.href = 'index.html';
           return;
         }
-        if (!nodeRes.ok) throw new Error(`Error ${nodeRes.status}: ${await nodeRes.text()}`);
+        if (!nodeRes.ok) throw new Error(`Failed to load node: ${await nodeRes.text()}`);
         const data = await nodeRes.json();
         if (!data) throw new Error('Node not found');
-        nodeId = data.id; // Store node ID for editing
+        nodeId = data.id; // Store nodeId for editing
 
         // Fetch relationships
         const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(id)}/relations`, { headers });
-        if (!relRes.ok) throw new Error(`Error ${relRes.status}: ${await relRes.text()}`);
+        if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
         const relData = await relRes.json();
         data.outgoing = relData.outgoing || [];
         data.incoming = relData.incoming || [];
@@ -246,7 +248,8 @@
         updateAuthUI();
       } catch (error) {
         console.error('Load error:', error);
-        document.getElementById('page-title').textContent = `Error: ${error.message}`;
+        document.getElementById('page-title').textContent = 'Error';
+        document.getElementById('content').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
       }
     }
 
@@ -257,7 +260,7 @@
     }
 
     function renderPage(data) {
-      const title = data.properties.name || data.properties.title || data.properties.id || data.id;
+      const title = data.properties.name || data.properties.title || data.properties.nodeId || data.id;
       document.getElementById('page-title').textContent = title;
       document.getElementById('createRelationshipBtn').href = `relationship.html?fromType=${encodeURIComponent(type)}&fromId=${encodeURIComponent(data.id)}`;
       const infoTable = document.getElementById('info-table');
@@ -302,6 +305,7 @@
       propertiesTbody.innerHTML = '';
       propertyCount = 0;
       Object.entries(data.properties).forEach(([k, v]) => {
+        if (k === 'nodeId' || k === 'createdBy') return; // Skip protected properties
         const row = document.createElement('tr');
         row.className = 'property-row';
         row.innerHTML = `
@@ -321,7 +325,7 @@
         data.outgoing.forEach(r => {
           const li = document.createElement('li');
           const a = document.createElement('a');
-          const label = r.node.properties.name || r.node.properties.title || r.node.properties.id || r.node.id;
+          const label = r.node.properties.name || r.node.properties.title || r.node.properties.nodeId || r.node.id;
           a.textContent = `${r.type} → ${label}`;
           a.href = `info.html?type=${typeFromLabel(r.node.labels)}&id=${encodeURIComponent(r.node.id)}`;
           li.append(a);
@@ -339,7 +343,7 @@
         data.incoming.forEach(r => {
           const li = document.createElement('li');
           const a = document.createElement('a');
-          const label = r.node.properties.name || r.node.properties.title || r.node.properties.id || r.node.id;
+          const label = r.node.properties.name || r.node.properties.title || r.node.properties.nodeId || r.node.id;
           a.textContent = `${r.type} ← ${label}`;
           a.href = `info.html?type=${typeFromLabel(r.node.labels)}&id=${encodeURIComponent(r.node.id)}`;
           li.append(a);
@@ -352,7 +356,7 @@
 
     function typeFromLabel(labels) {
       if (!labels || !labels.length) return type || 'node';
-      return labels[0].toLowerCase();
+      return labels.find(label => label !== 'Entity') || 'node'; // Prefer non-Entity label
     }
 
     function isUrl(s) {
@@ -396,7 +400,7 @@
         const name = row.querySelector(`[name="prop-name-${index}"]`).value.trim();
         const value = row.querySelector(`[name="prop-value-${index}"]`).value.trim();
         if (name) {
-          if (/[^a-zA-Z0-9_]/.test(name)) {
+          if (/[^a-zA-Z0-9_]/.test(name) || name === 'nodeId' || name === 'createdBy') {
             invalidProp = true;
             return;
           }
@@ -405,7 +409,7 @@
       });
       if (invalidProp) {
         document.getElementById('updateErrorMessage').style.display = 'block';
-        document.getElementById('updateErrorMessage').textContent = 'Property names can only contain letters, numbers, or underscores';
+        document.getElementById('updateErrorMessage').textContent = 'Property names can only contain letters, numbers, underscores, and cannot be nodeId or createdBy';
         return;
       }
       try {
@@ -414,7 +418,7 @@
           window.location.href = 'index.html';
           return;
         }
-        const response = await fetch(`${API_BASE}/nodes/${nodeId}`, {
+        const response = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -430,8 +434,10 @@
         document.getElementById('propertiesDisplay').style.display = 'block';
 
         // Fetch updated relationships
-        const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, { headers: { 'Authorization': `Bearer ${token}` } });
-        if (!relRes.ok) throw new Error(`Error ${relRes.status}: ${await relRes.text()}`);
+        const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
         const relData = await relRes.json();
         data.outgoing = relData.outgoing || [];
         data.incoming = relData.incoming || [];

@@ -458,7 +458,6 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
   }
 });
 
-
 // --- Update Node ---
 /**
  * @openapi
@@ -683,71 +682,48 @@ app.post('/relation', requireAuth, async (req, res, next) => {
  * @openapi
  * /nodes/{id}/relations:
  *   get:
- *     summary: Get all relationships for a node
+ *     summary: Get incoming and outgoing relationships for a node
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
  *     responses:
  *       200:
- *         description: List of relationships
+ *         description: Relationships found
  *       404:
  *         description: Node not found
  */
 app.get('/nodes/:id/relations', async (req, res, next) => {
-  const id = req.params.id;
+  const { id: nodeId } = req.params;
   const session = driver.session();
   try {
     const result = await session.run(
       `
-      MATCH (n) WHERE id(n) = $id
-      OPTIONAL MATCH (n)-[r]->(m)
-      OPTIONAL MATCH (p)-[r2]->(n)
-      RETURN
-        collect(DISTINCT {
-          relId: id(r),
-          type: type(r),
-          direction: "outgoing",
-          node: { id: id(m), labels: labels(m), properties: properties(m) }
-        }) AS outgoing,
-        collect(DISTINCT {
-          relId: id(r2),
-          type: type(r2),
-          direction: "incoming",
-          node: { id: id(p), labels: labels(p), properties: properties(p) }
-        }) AS incoming
+      MATCH (n:Entity {nodeId: $nodeId})
+      OPTIONAL MATCH (n)-[outRel]->(outNode:Entity)
+      OPTIONAL MATCH (inNode:Entity)-[inRel]->(n)
+      RETURN n,
+             COLLECT(DISTINCT {
+               type: type(outRel),
+               node: { id: outNode.nodeId, labels: labels(outNode), properties: properties(outNode) }
+             }) AS outgoing,
+             COLLECT(DISTINCT {
+               type: type(inRel),
+               node: { id: inNode.nodeId, labels: labels(inNode), properties: properties(inNode) }
+             }) AS incoming
       `,
-      { id: neo4j.int(id) }
+      { nodeId }
     );
     if (result.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
     }
     const record = result.records[0];
-    const response = {
-      outgoing: record.get('outgoing').filter(r => r.node && r.node.id).map(r => ({
-        id: r.relId.toString(),
-        type: r.type,
-        direction: r.direction,
-        node: {
-          id: r.node.id.toString(),
-          labels: r.node.labels,
-          properties: r.node.properties
-        }
-      })),
-      incoming: record.get('incoming').filter(r => r.node && r.node.id).map(r => ({
-        id: r.relId.toString(),
-        type: r.type,
-        direction: r.direction,
-        node: {
-          id: r.node.id.toString(),
-          labels: r.node.labels,
-          properties: r.node.properties
-        }
-      }))
-    };
-    res.json(response);
+    res.json({
+      outgoing: record.get('outgoing').filter(rel => rel.type), // Filter out null relationships
+      incoming: record.get('incoming').filter(rel => rel.type)
+    });
   } catch (err) {
     next(err);
   } finally {
