@@ -222,11 +222,15 @@ app.post('/login', async (req, res, next) => {
       'MATCH (u:User {username: $username}) RETURN u',
       { username }
     );
+    console.log("Logging in " + username);
     if (result.records.length === 0) {
       return res.status(401).json({ error: { code: 'INVALID_CREDENTIALS', message: 'Invalid username or password' } });
     }
+    console.log("submitted password: " + password);
     const user = result.records[0].get('u').properties;
+    console.log("hashed password: " + user.passwordHash);
     const isValid = await bcrypt.compare(password, user.passwordHash);
+    console.log(isValid);
     if (!isValid) {
       return res.status(401).json({ error: { code: 'INVALID_CREDENTIALS', message: 'Invalid username or password' } });
     }
