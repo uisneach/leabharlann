@@ -331,6 +331,7 @@
     });
 
     document.getElementById('createRelationshipForm').addEventListener('submit', async e => {
+      console.log("submit");
       e.preventDefault();
       const errorMessage = document.getElementById('errorMessage');
       errorMessage.style.display = 'none';

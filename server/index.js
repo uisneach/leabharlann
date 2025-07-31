@@ -642,6 +642,9 @@ app.post('/relation', requireAuth, async (req, res, next) => {
   }
   const session = driver.session();
   try {
+    console.log("Trying to find source node in relations...");
+    console.log("From Label: " + fromLabel);
+    console.log("From ID: " + fromId);
     const checkResult = await session.run(
       'MATCH (a:Entity:\`${fromLabel}\` {nodeId: $fromId}) RETURN a.createdBy AS createdBy',
       { fromId }
