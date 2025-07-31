@@ -775,36 +775,47 @@ app.get('/nodes/:id/relations', async (req, res, next) => {
   const session = driver.session();
   try {
     const result = await session.run(
-      `
-      MATCH (n:Entity {nodeId: $nodeId})
+      `MATCH (n:Entity {nodeId: $nodeId})
       OPTIONAL MATCH (n)-[outRel]->(outNode:Entity)
       OPTIONAL MATCH (inNode:Entity)-[inRel]->(n)
-      RETURN n,
-             COLLECT(DISTINCT {
-               type: type(outRel),
-               node: { id: outNode.nodeId, labels: labels(outNode), properties: properties(outNode) }
-             }) AS outgoing,
-             COLLECT(DISTINCT {
-               type: type(inRel),
-               node: { id: inNode.nodeId, labels: labels(inNode), properties: properties(inNode) }
-             }) AS incoming
-      `,
+      RETURN
+        COLLECT(DISTINCT {
+          relId: id(outRel),
+          type:  type(outRel),
+          node: {
+            id:         outNode.nodeId,
+            labels:     labels(outNode),
+            properties: properties(outNode)
+          }
+        }) AS outgoing,
+        COLLECT(DISTINCT {
+          relId: id(inRel),
+          type:  type(inRel),
+          node: {
+            id:         inNode.nodeId,
+            labels:     labels(inNode),
+            properties: properties(inNode)
+          }
+        }) AS incoming`,
       { nodeId }
     );
+
     if (result.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
     }
+
     const record = result.records[0];
-    res.json({
-      outgoing: record.get('outgoing').filter(rel => rel.type), // Filter out null relationships
-      incoming: record.get('incoming').filter(rel => rel.type)
-    });
+    // Filter out any entries where relId is null (i.e. the optional match had no real rel)
+    const outgoing = record.get('outgoing').filter(r => r.relId !== null);
+    const incoming = record.get('incoming').filter(r => r.relId !== null);
+    res.json({ outgoing, incoming });
   } catch (err) {
     next(err);
   } finally {
     await session.close();
   }
 });
+
 
 // --- Delete Relationship ---
 /**
@@ -961,7 +972,6 @@ app.delete('/relation/:id/property/:key', requireAuth, async (req, res, next) =>
     }
   }
 );
-
 
 // --- Search Nodes ---
 /**
