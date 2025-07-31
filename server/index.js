@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 app.use(express.json());
@@ -355,31 +356,31 @@ app.get('/nodes', async (req, res, next) => {
  *   get:
  *     summary: Get a node by ID
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
  *     responses:
  *       200:
- *         description: Node details
+ *         description: Node found
  *       404:
  *         description: Node not found
  */
 app.get('/nodes/:id', async (req, res, next) => {
-  const id = req.params.id;
+  const { id } = req.params;
   const session = driver.session();
   try {
     const result = await session.run(
-      'MATCH (n) WHERE id(n) = $id RETURN n',
-      { id: neo4j.int(id) }
+      'MATCH (n:Entity {nodeId: $nodeId}) RETURN n',
+      { nodeId: id }
     );
     if (result.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
     }
     const node = result.records[0].get('n');
     res.json({
-      id: node.identity.toString(),
+      id: node.properties.nodeId,
       labels: node.labels,
       properties: node.properties
     });
@@ -418,17 +419,12 @@ app.get('/nodes/:id', async (req, res, next) => {
  *         description: Unauthorized
  */
 app.post('/nodes', requireAuth, async (req, res, next) => {
-  const { labels, properties } = req.body;
-  if (!labels || !Array.isArray(labels) || labels.length === 0) {
+  const { labels = [], properties = {} } = req.body;
+  if (!labels.length) {
     return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'At least one label is required' } });
   }
-  if (!properties || typeof properties !== 'object') {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Properties must be an object' } });
-  }
-  for (const label of labels) {
-    if (!validIdentifier(label)) {
-      return res.status(400).json({ error: { code: 'INVALID_LABEL', message: `Invalid label: ${label}` } });
-    }
+  if (labels.some(label => !validIdentifier(label))) {
+    return res.status(400).json({ error: { code: 'INVALID_LABEL', message: 'Invalid label format' } });
   }
   for (const prop in properties) {
     if (!validIdentifier(prop)) {
@@ -437,14 +433,21 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
   }
   const session = driver.session();
   try {
-    const cypherLabels = labels.map(label => `\`${label}\``).join(':');
-    const result = await session.run(
-      `CREATE (n:${cypherLabels} $properties) SET n.createdBy = $username RETURN n`,
-      { properties: { ...properties, createdBy: req.user.username }, username: req.user.username }
+    const nodeId = uuidv4(); // Generate custom UUID for nodeId
+    const allLabels = ['Entity', ...labels]; // Always include Entity label
+        const result = await session.run(
+      `
+      CREATE (n:Node ${allLabels.map(label => `:${label}`).join('')})
+      SET n += $properties
+      SET n.id = $customId
+      SET n.createdBy = $username
+      RETURN n, id(n) AS internalId
+      `,
+      { properties, customId, username: req.user.username }
     );
     const node = result.records[0].get('n');
     res.status(201).json({
-      id: node.identity.toString(),
+      id: node.properties.id,
       labels: node.labels,
       properties: node.properties
     });
@@ -455,15 +458,16 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
   }
 });
 
+
 // --- Update Node ---
 /**
  * @openapi
  * /nodes/{id}:
  *   put:
- *     summary: Update node properties
+ *     summary: Update a node's properties
  *     parameters:
- *       - name: id
- *         in: path
+ *       - in: path
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
@@ -489,7 +493,7 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
  *         description: Node not found
  */
 app.put('/nodes/:id', requireAuth, async (req, res, next) => {
-  const id = req.params.id;
+  const { id: nodeId } = req.params;
   const { properties } = req.body;
   if (!properties || typeof properties !== 'object') {
     return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Properties must be an object' } });
@@ -498,12 +502,15 @@ app.put('/nodes/:id', requireAuth, async (req, res, next) => {
     if (!validIdentifier(prop)) {
       return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: `Invalid property: ${prop}` } });
     }
+    if (prop === 'nodeId' || prop === 'createdBy') {
+      return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: 'Cannot modify nodeId or createdBy' } });
+    }
   }
   const session = driver.session();
   try {
     const checkResult = await session.run(
-      'MATCH (n) WHERE id(n) = $id RETURN n.createdBy AS createdBy',
-      { id: neo4j.int(id) }
+      'MATCH (n:Entity {nodeId: $nodeId}) RETURN n.createdBy AS createdBy',
+      { nodeId }
     );
     if (checkResult.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
@@ -513,12 +520,12 @@ app.put('/nodes/:id', requireAuth, async (req, res, next) => {
       return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only update nodes you created' } });
     }
     const result = await session.run(
-      'MATCH (n) WHERE id(n) = $id SET n += $properties RETURN n',
-      { id: neo4j.int(id), properties }
+      'MATCH (n:Entity {nodeId: $nodeId}) SET n += $properties RETURN n',
+      { nodeId, properties }
     );
     const node = result.records[0].get('n');
     res.json({
-      id: node.identity.toString(),
+      id: node.properties.nodeId,
       labels: node.labels,
       properties: node.properties
     });
@@ -634,8 +641,8 @@ app.post('/relation', requireAuth, async (req, res, next) => {
   const session = driver.session();
   try {
     const checkResult = await session.run(
-      'MATCH (a:\`${fromLabel}\`) WHERE id(a) = $fromId RETURN a.createdBy AS createdBy',
-      { fromId: neo4j.int(fromId) }
+      'MATCH (a:Entity:\`${fromLabel}\` {nodeId: $fromId}) RETURN a.createdBy AS createdBy',
+      { fromId }
     );
     if (checkResult.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Source node not found' } });
@@ -646,14 +653,14 @@ app.post('/relation', requireAuth, async (req, res, next) => {
     }
     const result = await session.run(
       `
-      MATCH (a:\`${fromLabel}\`) WHERE id(a) = $fromId
-      MATCH (b:\`${toLabel}\`) WHERE id(b) = $toId
+      MATCH (a:Entity:\`${fromLabel}\` {nodeId: $fromId})
+      MATCH (b:Entity:\`${toLabel}\` {nodeId: $toId})
       CREATE (a)-[r:\`${relType}\`]->(b)
       SET r += $relProps
       SET r.createdBy = $username
       RETURN id(r) AS relId, type(r) AS type, properties(r) AS props
       `,
-      { fromId: neo4j.int(fromId), toId: neo4j.int(toId), relProps: { ...relProps, createdBy: req.user.username }, username: req.user.username }
+      { fromId, toId, relProps: { ...relProps, createdBy: req.user.username }, username: req.user.username }
     );
     if (result.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Target node not found' } });
@@ -753,63 +760,44 @@ app.get('/nodes/:id/relations', async (req, res, next) => {
  * @openapi
  * /search:
  *   get:
- *     summary: Search for nodes by label, property, and value
+ *     summary: Search nodes by label and property
  *     parameters:
- *       - name: label
- *         in: query
+ *       - in: query
+ *         name: label
  *         required: true
  *         schema:
  *           type: string
- *       - name: property
- *         in: query
+ *       - in: query
+ *         name: property
  *         required: true
  *         schema:
  *           type: string
- *       - name: value
- *         in: query
+ *       - in: query
+ *         name: value
  *         required: true
  *         schema:
  *           type: string
- *       - name: limit
- *         in: query
- *         description: Number of results to return
- *         schema:
- *           type: integer
- *           default: 10
- *       - name: offset
- *         in: query
- *         description: Number of results to skip
- *         schema:
- *           type: integer
- *           default: 0
  *     responses:
  *       200:
- *         description: List of matching nodes
+ *         description: Search results
  *       400:
  *         description: Invalid input
  */
 app.get('/search', async (req, res, next) => {
-  const { label, property, value, limit = 10, offset = 0 } = req.query;
-  if (!label || !property || !value) {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Label, property, and value are required' } });
-  }
-  if (!validIdentifier(label) || !validIdentifier(property)) {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Invalid label or property format' } });
+  const { label, property, value } = req.query;
+  if (!label || !property || !value || !validIdentifier(label) || !validIdentifier(property)) {
+    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Invalid label or property' } });
   }
   const session = driver.session();
   try {
-    const cypher = `
-      MATCH (n:\`${label}\`)
-      WHERE toLower(n.\`${property}\`) CONTAINS toLower($value)
-      RETURN n
-      SKIP $offset
-      LIMIT $limit
-    `;
-    const result = await session.run(cypher, { value, offset: neo4j.int(offset), limit: neo4j.int(limit) });
+    const result = await session.run(
+      `MATCH (n:Entity:\`${label}\` {${property}: $value}) RETURN n`,
+      { value }
+    );
     const nodes = result.records.map(record => {
       const node = record.get('n');
       return {
-        id: node.identity.toString(),
+        id: node.properties.nodeId,
         labels: node.labels,
         properties: node.properties
       };
