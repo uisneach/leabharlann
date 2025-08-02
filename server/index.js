@@ -394,6 +394,45 @@ app.get('/nodes/:id', async (req, res, next) => {
   }
 });
 
+// --- Get List of Labels ---
+/**
+ * @openapi
+ * /labels:
+ *   get:
+ *     summary: Retrieve all unique labels in the database
+ *     responses:
+ *       200:
+ *         description: List of all unique node labels
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 labels:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   description: Array of unique node labels
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+app.get('/labels', requireAuth, async (req, res, next) => {
+  const session = driver.session();
+  try {
+    const result = await session.run('CALL db.labels()');
+    const labels = result.records
+      .map(record => record.get('label'))
+      .filter(label => label !== 'User');
+    res.status(200).json({ labels });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
 // --- Create Node ---
 /**
  * @openapi

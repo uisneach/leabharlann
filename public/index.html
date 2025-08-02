@@ -1,4 +1,3 @@
-</html>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -90,7 +89,6 @@
           try {
             const payload = JSON.parse(atob(token.split('.')[1]));
             if (Date.now() >= payload.exp * 1000 && refreshToken) {
-              // Token expired, try to refresh
               const response = await fetch(`${API_BASE}/refresh`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -183,7 +181,7 @@
               if (!response.ok) throw new Error('Search failed');
               const results = await response.json();
               if (results.length > 0) {
-                const node = results[0]; // Take first result
+                const node = results[0];
                 window.location = `info.html?type=Author&id=${encodeURIComponent(node.id)}`;
               } else {
                 document.getElementById('errorMessage').style.display = 'block';
@@ -204,85 +202,149 @@
     </script>
   </header>
   <div id="content" class="container-fluid">
-    <div class="row">
-      <div class="col-md-4">
-        <div class="d-flex justify-content-between align-items-center">
-          <h2 class="section-title">Authors</h2>
-          <a href="create.html?type=Author" class="btn btn-sm btn-primary create-btn" style="display: none;">+</a>
-        </div>
-        <ul id="authors-list" class="node-list"></ul>
-      </div>
-      <div class="col-md-4">
-        <div class="d-flex justify-content-between align-items-center">
-          <h2 class="section-title">Texts</h2>
-          <a href="create.html?type=Text" class="btn btn-sm btn-primary create-btn" style="display: none;">+</a>
-        </div>
-        <ul id="texts-list" class="node-list"></ul>
-      </div>
-      <div class="col-md-4">
-        <div class="d-flex justify-content-between align-items-center">
-          <h2 class="section-title">Editions</h2>
-          <a href="create.html?type=Edition" class="btn btn-sm btn-primary create-btn" style="display: none;">+</a>
-        </div>
-        <ul id="editions-list" class="node-list"></ul>
-      </div>
+    <div class="mb-3">
+      <label for="add-label-select" class="form-label">Add Column:</label>
+      <select id="add-label-select" class="form-select w-auto d-inline-block">
+        <option value="">Select a label</option>
+      </select>
+      <button id="add-label-btn" class="btn btn-primary ms-2">Add</button>
     </div>
+    <div id="columns" class="row"></div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
   <script>
-  const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
+    const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
+    const defaultLabels = ['Author', 'Text', 'Edition'];
 
-  function populateList(containerId, items, type, labelKey) {
-    const ul = document.getElementById(containerId);
-    ul.innerHTML = '';
-    items.forEach(item => {
-      const li = document.createElement('li');
-      const a = document.createElement('a');
-      const label = item.properties[labelKey] || item.properties.id || item.id;
-      a.textContent = label;
-      a.href = `info.html?type=${encodeURIComponent(type)}&id=${encodeURIComponent(item.id)}`;
-      li.appendChild(a);
-      ul.appendChild(li);
-    });
-  }
-
-  async function fetchNodesByLabel(label, property) {
-    const token = localStorage.getItem('token');
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-    const res = await fetch(`${API_BASE}/nodes?label=${encodeURIComponent(label)}`, { headers });
-    if (!res.ok) throw new Error(`Failed to load ${label} nodes`);
-    return res.json();
-  }
-
-  async function loadHome() {
-    try {
-      const [authors, texts, editions] = await Promise.all([
-        fetchNodesByLabel('Author', 'name'),
-        fetchNodesByLabel('Text', 'title'),
-        fetchNodesByLabel('Edition', 'title')
-      ]);
-      populateList('authors-list', authors, 'Author', 'name');
-      populateList('texts-list', texts, 'Text', 'title');
-      populateList('editions-list', editions, 'Edition', 'title');
-      updateAuthUI();
-    } catch (err) {
-      console.error('Load error:', err);
-      document.getElementById('content').innerHTML =
-        `<p class="text-danger">Error loading data: ${err.message}</p>`;
+    async function fetchLabels() {
+      const token = localStorage.getItem('token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch(`${API_BASE}/labels`, { headers });
+      if (!res.ok) throw new Error('Failed to load labels');
+      const data = await res.json();
+      return data.labels;
     }
-  }
 
-  function updateAuthUI() {
-    document.querySelectorAll('.create-btn').forEach(btn => {
-      btn.style.display = localStorage.getItem('token') ? 'block' : 'none';
+    async function fetchNodesByLabel(label) {
+      const token = localStorage.getItem('token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch(`${API_BASE}/nodes?label=${encodeURIComponent(label)}`, { headers });
+      if (!res.ok) throw new Error(`Failed to load ${label} nodes`);
+      return res.json();
+    }
+
+    function populateList(containerId, items, type, labelKey) {
+      const ul = document.getElementById(containerId);
+      ul.innerHTML = '';
+      items.forEach(item => {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        const label = item.properties[labelKey] || item.properties.id || item.id;
+        a.textContent = label;
+        a.href = `info.html?type=${encodeURIComponent(type)}&id=${encodeURIComponent(item.id)}`;
+        li.appendChild(a);
+        ul.appendChild(li);
+      });
+    }
+
+    function createColumn(label) {
+      const col = document.createElement('div');
+      col.className = 'col-md-4';
+      col.id = `col-${label}`;
+      col.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+          <h2 class="section-title">${label}</h2>
+          <div>
+            <a href="create.html?type=${encodeURIComponent(label)}" class="btn btn-sm btn-primary create-btn" style="display: none;">+</a>
+            <button class="btn btn-sm btn-danger remove-btn" data-label="${label}">Remove</button>
+          </div>
+        </div>
+        <ul id="${label}-list" class="node-list"></ul>
+      `;
+      return col;
+    }
+
+    async function renderColumn(label) {
+      try {
+        const nodes = await fetchNodesByLabel(label);
+        const col = createColumn(label);
+        document.getElementById('columns').appendChild(col);
+        populateList(`${label}-list`, nodes, label, label === 'Author' ? 'name' : 'title');
+        updateAuthUI();
+        attachRemoveButtonListeners();
+      } catch (err) {
+        console.error(`Error rendering column ${label}:`, err);
+      }
+    }
+
+    function updateAuthUI() {
+      const isAuthenticated = !!localStorage.getItem('token');
+      document.querySelectorAll('.create-btn').forEach(btn => {
+        btn.style.display = isAuthenticated ? 'block' : 'none';
+      });
+      document.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.style.display = defaultLabels.includes(btn.dataset.label) && document.querySelectorAll('.col-md-4').length <= 3
+          ? 'none' : 'inline-block';
+      });
+    }
+
+    function attachRemoveButtonListeners() {
+      document.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const label = btn.dataset.label;
+          const col = document.getElementById(`col-${label}`);
+          if (col) col.remove();
+          updateAddLabelDropdown();
+          updateAuthUI();
+        });
+      });
+    }
+
+    async function updateAddLabelDropdown() {
+      const select = document.getElementById('add-label-select');
+      select.innerHTML = '<option value="">Select a label</option>';
+      try {
+        const labels = await fetchLabels();
+        const activeLabels = Array.from(document.querySelectorAll('.col-md-4')).map(col => col.id.replace('col-', ''));
+        labels.forEach(label => {
+          if (!activeLabels.includes(label)) {
+            const option = document.createElement('option');
+            option.value = label;
+            option.textContent = label;
+            select.appendChild(option);
+          }
+        });
+      } catch (err) {
+        console.error('Error updating dropdown:', err);
+      }
+    }
+
+    async function loadHome() {
+      try {
+        await Promise.all(defaultLabels.map(label => renderColumn(label)));
+        await updateAddLabelDropdown();
+        document.getElementById('add-label-btn').addEventListener('click', async () => {
+          const select = document.getElementById('add-label-select');
+          const label = select.value;
+          if (label) {
+            await renderColumn(label);
+            select.value = '';
+            updateAddLabelDropdown();
+          }
+        });
+        updateAuthUI();
+      } catch (err) {
+        console.error('Load error:', err);
+        document.getElementById('content').innerHTML =
+          `<p class="text-danger">Error loading data: ${err.message}</p>`;
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadHome();
     });
-  }
 
-  window.addEventListener('DOMContentLoaded', () => {
-    loadHome();
-  });
-
-  document.addEventListener('authChange', updateAuthUI);
-</script>
+    document.addEventListener('authChange', updateAuthUI);
+  </script>
 </body>
 </html>
