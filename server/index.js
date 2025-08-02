@@ -418,7 +418,7 @@ app.get('/nodes/:id', async (req, res, next) => {
  *       500:
  *         description: Server error
  */
-app.get('/labels', requireAuth, async (req, res, next) => {
+app.get('/labels', async (req, res, next) => {
   const session = driver.session();
   try {
     const result = await session.run('CALL db.labels()');
