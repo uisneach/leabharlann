@@ -233,15 +233,19 @@
       return res.json();
     }
 
-    function populateList(containerId, items, type, labelKey) {
+    function populateList(containerId, items, type, labelKeys) {
       const ul = document.getElementById(containerId);
+      if (!ul) return;
       ul.innerHTML = '';
       items.forEach(item => {
         const li = document.createElement('li');
         const a = document.createElement('a');
-        const label = item.properties[labelKey] || item.properties.id || item.id;
-        a.textContent = label;
-        a.href = `info.html?type=${encodeURIComponent(type)}&id=${encodeURIComponent(item.id)}`;
+        const keys = Array.isArray(labelKeys) ? labelKeys : [labelKeys];
+        const properties = item.properties || {};
+        const id = item.id || '';
+        const label = keys.reduce((result, key) => result || properties[key], '') || id;
+        a.textContent = label || 'Unknown';
+        a.href = `info.html?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`;
         li.appendChild(a);
         ul.appendChild(li);
       });
@@ -269,7 +273,7 @@
         const nodes = await fetchNodesByLabel(label);
         const col = createColumn(label);
         document.getElementById('columns').appendChild(col);
-        populateList(`${label}-list`, nodes, label, label === 'Author' ? 'name' : 'title');
+        populateList(`${label}-list`, nodes, label, ['name', 'title']);
         updateAuthUI();
         attachRemoveButtonListeners();
       } catch (err) {
