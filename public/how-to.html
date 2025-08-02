@@ -208,13 +208,16 @@
     <p>Welcome to <strong>An Leabharlann Ghealach</strong>, a database for Irish and Celtic source texts. This website will allow users to log and cite texts, keep track of secondary analyses, and discover new texts in the network. An Leabharlann will help keep track of all editions and translations of a text and where they can be found online.</p>
 
     <h2 id="neo4j" class="mt-5">1. Built on Neo4j</h2>
-    <p><a href="https://neo4j.com" target="_blank">Neo4j</a> is a graph database designed to store data as <strong>nodes</strong>, and interactions between data as <strong>relationships</strong>. Unlike traditional databases that use tables, Neo4j organizes data into a graph structure, making it ideal for representing complex relationships, such as those between authors, texts, and editions in this application.</p>
+    <p><a href="https://neo4j.com" target="_blank">Neo4j</a> is a graph database designed to store data as <strong>nodes</strong>, and connections between data as <strong>relationships</strong>. Unlike traditional databases that use tables, Neo4j organizes data into a graph structure, making it ideal for representing complex relationships, such as those between authors, texts, editions, publishers, websites, and text versions in this application.</p>
     <ul>
-      <li><strong>Nodes</strong>: Represent entities like Authors, Texts, or Editions. Each node has labels (e.g., `Author`, `Text`) and properties (e.g., `name: "Jane Doe"`).</li>
-      <li><strong>Relationships</strong>: Connect nodes with types like `WROTE` or `PUBLISHED`, allowing you to model how entities are related.</li>
-      <li><strong>Benefits</strong>: Neo4j’s graph structure makes it easy to query relationships (e.g., finding all texts an author wrote) and visualize complex connections.</li>
+      <li><strong>Nodes</strong>: Represent entities like Authors, Texts, or Publishers. Any data which might have multiple data points under it should be a node with properties. Each node has labels (e.g., `Author`, `Text`) and properties (e.g., `name: "Jane Doe"`).</li>
+      <li><strong>Relationships</strong>: Connect nodes through relationships like A `WROTE` B or C `PUBLISHED` D, allowing us to model how entities are related.</li>
     </ul>
-    <p>In An Leabharlann Ghealach, Neo4j powers the backend, enabling you to store, search, and manage interconnected data efficiently.</p>
+    <p>A node has properties, and a relationship connects nodes. For example, if we had a node for Homer, it would look like this:</p>
+    <img src="" alt="Homer Node"/>
+    <p>And if we had a node for the Iliad, it could look like this:</p>
+    <img src="" alt="Iliad Node" />
+    <p>Then we could relate them by saying that Homer WROTE The Iliad:</p>
 
     <h2 id="database-layout" class="mt-5">2. How is this Database Laid Out?</h2>
     <p>The database in An Leabharlann Ghealach is structured as a graph with nodes and relationships, tailored to manage literary data.</p>
