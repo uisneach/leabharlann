@@ -1162,7 +1162,7 @@ async function createFullTextIndex() {
     await session.run(`
       CREATE FULLTEXT INDEX nodeProperties IF NOT EXISTS
       FOR (n:Entity)
-      ON (n.name, n.title, n.description)
+      ON EACH [n.name, n.title, n.description]
     `);
     console.log('Full‐text index "nodeProperties" ensured');
   } catch (error) {
