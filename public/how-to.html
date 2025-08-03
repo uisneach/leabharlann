@@ -25,7 +25,7 @@
         An Leabharlann Ghealach
       </a>
       <form id="search-form" class="d-flex mx-3" style="flex:1;">
-        <input id="search-input" class="form-control me-2" type="search" placeholder="Search authors, texts, editions…" aria-label="Search">
+        <input id="search-input" class="form-control me-2" type="search" placeholder="Search the database…" aria-label="Search">
         <button class="btn btn-light" type="submit">Search</button>
       </form>
       <ul class="navbar-nav">
@@ -59,9 +59,20 @@
         </div>
       </div>
     </div>
+    <div class="modal fade" id="searchResultsModal" tabindex="-1" aria-labelledby="searchResultsModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="searchResultsModalLabel">Search Results</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="searchResults" class="list-group"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <script>
-      const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
-
       function updateProfileMenu(username) {
         const profileMenu = document.getElementById('profileMenu');
         if (!profileMenu) return;
@@ -182,29 +193,46 @@
           searchForm.addEventListener('submit', async e => {
             e.preventDefault();
             const q = document.getElementById('search-input').value.trim();
-            if (!q) return;
+            if (!q || q.length < 2) {
+              const errorMessage = document.getElementById('errorMessage');
+              errorMessage.style.display = 'block';
+              errorMessage.textContent = 'Please enter at least 2 characters';
+              return;
+            }
             try {
               const token = localStorage.getItem('token');
               const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-              const response = await fetch(
-                `${API_BASE}/search?label=Author&property=name&value=${encodeURIComponent(q)}`,
-                { headers }
-              );
-              if (!response.ok) throw new Error('Search failed');
+              const response = await fetch(`${API_BASE}/search?query=${encodeURIComponent(q)}`, { headers });
+              if (!response.ok) throw new Error((await response.json()).error.message || 'Search failed');
               const results = await response.json();
-              if (results.length > 0) {
-                const node = results[0];
-                window.location = `info.html?type=Author&id=${encodeURIComponent(node.id)}`;
-              } else {
-                document.getElementById('errorMessage').style.display = 'block';
-                document.getElementById('errorMessage').textContent = 'No results found';
-              }
+              displaySearchResults(results, q);
             } catch (error) {
-              document.getElementById('errorMessage').style.display = 'block';
-              document.getElementById('errorMessage').textContent = error.message;
+              const errorMessage = document.getElementById('errorMessage');
+              errorMessage.style.display = 'block';
+              errorMessage.textContent = error.message;
             }
           });
         }
+      }
+
+      function displaySearchResults(results, query) {
+        const searchResults = document.getElementById('searchResults');
+        searchResults.innerHTML = '';
+        if (results.length === 0) {
+          searchResults.innerHTML = '<p class="text-muted">No results found for "' + query + '"</p>';
+        } else {
+          results.forEach(node => {
+            const label = node.labels.find(l => l !== 'Entity') || 'Node';
+            const displayName = node.properties.name || node.properties.title || node.id || 'Unknown';
+            const item = document.createElement('a');
+            item.className = 'list-group-item list-group-item-action';
+            item.href = `info.html?type=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
+            item.innerHTML = `<strong>${label}</strong>: ${displayName}`;
+            searchResults.appendChild(item);
+          });
+        }
+        const modal = new bootstrap.Modal(document.getElementById('searchResultsModal'));
+        modal.show();
       }
 
       window.addEventListener('DOMContentLoaded', () => {

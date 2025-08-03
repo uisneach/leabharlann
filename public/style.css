@@ -21,6 +21,8 @@ header .navbar-brand {
   font-family: "Bunchlo";
   font-size: 1.5rem;
   font-weight: bold;
+  display: flex;
+  align-items: center;
 }
 header .navbar-nav .nav-link .navbar-text { color: white; }
 #content {
@@ -145,6 +147,9 @@ h1.page-title {
 .table { margin-bottom: 0; }
 .table input { margin: 0.25rem 0; }
 
+header img {
+  margin: 0 8px;
+}
 img {
   margin-bottom: 20px;
 }
