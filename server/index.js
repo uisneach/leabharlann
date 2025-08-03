@@ -1053,51 +1053,139 @@ app.delete('/relation/:id/property/:key', requireAuth, async (req, res, next) =>
  * @openapi
  * /search:
  *   get:
- *     summary: Search nodes by label and property
+ *     summary: Search nodes by partial matches on labels, property names, or property values
+ *     description: Searches for nodes in the Neo4j database where the label, any property name, or any indexed property value (e.g., name, title, isbn, publication_year) partially matches the query string. Excludes nodes with the User label. Returns up to 50 results.
  *     parameters:
  *       - in: query
- *         name: label
+ *         name: query
  *         required: true
  *         schema:
  *           type: string
- *       - in: query
- *         name: property
- *         required: true
- *         schema:
- *           type: string
- *       - in: query
- *         name: value
- *         required: true
- *         schema:
- *           type: string
+ *           minLength: 2
+ *         description: The search term to match against node labels, property names, or property values (e.g., "Auth" for Author, "na" for name, "Jane" for Jane Doe).
+ *         example: Jane
  *     responses:
  *       200:
- *         description: Search results
+ *         description: A list of matching nodes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                     description: The unique identifier (UUID) of the node
+ *                   labels:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     description: The labels of the node (e.g., ["Entity", "Author"])
+ *                   properties:
+ *                     type: object
+ *                     description: The node's properties (e.g., { name: "Jane Doe", createdBy: "user1" })
+ *               example:
+ *                 - id: "123e4567-e89b-12d3-a456-426614174000"
+ *                   labels: ["Entity", "Author"]
+ *                   properties: { name: "Jane Doe", createdBy: "user1" }
+ *                 - id: "223e4567-e89b-12d3-a456-426614174001"
+ *                   labels: ["Entity", "Text"]
+ *                   properties: { title: "Jane's Book", createdBy: "user1" }
  *       400:
- *         description: Invalid input
+ *         description: Invalid query parameter (e.g., missing or less than 2 characters)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: INVALID_QUERY
+ *                     message:
+ *                       type: string
+ *                       example: Query must be a string with at least 2 characters
+ *       401:
+ *         description: Unauthorized (if token is invalid)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: UNAUTHORIZED
+ *                     message:
+ *                       type: string
+ *                       example: Invalid token
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: object
+ *                   properties:
+ *                     code:
+ *                       type: string
+ *                       example: SERVER_ERROR
+ *                     message:
+ *                       type: string
+ *                       example: Internal server error
  */
-app.get('/search', async (req, res, next) => {
-  const { label, property, value } = req.query;
-  if (!label || !property || !value || !validIdentifier(label) || !validIdentifier(property)) {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Invalid label or property' } });
+app.get('/search', authenticateToken, async (req, res) => {
+  const { query } = req.query;
+  if (!query || typeof query !== 'string' || query.length < 2) {
+    return res.status(400).json({ error: { code: 'INVALID_QUERY', message: 'Query must be a string with at least 2 characters' } });
   }
   const session = driver.session();
   try {
-    const result = await session.run(
-      `MATCH (n:Entity:\`${label}\` {${property}: $value}) RETURN n`,
-      { value }
-    );
-    const nodes = result.records.map(record => {
-      const node = record.get('n');
-      return {
-        id: node.properties.nodeId,
-        labels: node.labels,
-        properties: node.properties
-      };
-    });
+    // Get labels excluding User
+    const labelResult = await session.run('CALL db.labels() YIELD label WHERE label <> "User" RETURN label');
+    const labels = labelResult.records.map(record => record.get('label'));
+    
+    // Search for partial matches on labels, property keys, and values
+    const result = await session.run(`
+      CALL {
+        // Match nodes by partial label
+        CALL db.labels() YIELD label
+        WHERE toLower(label) CONTAINS toLower($query) AND label <> 'User'
+        MATCH (n) WHERE label IN labels(n)
+        RETURN n, labels(n) AS labels, 'label' AS matchType
+        UNION
+        // Match nodes by property keys
+        MATCH (n:Entity)
+        WHERE ANY(key IN keys(n) WHERE toLower(key) CONTAINS toLower($query))
+        RETURN n, labels(n) AS labels, 'propertyKey' AS matchType
+        UNION
+        // Match nodes by property values using full-text index
+        CALL db.index.fulltext.queryNodes('nodeProperties', $query + '*')
+        YIELD node AS n, score
+        WHERE 'Entity' IN labels(n)
+        RETURN n, labels(n) AS labels, 'value' AS matchType
+      }
+      RETURN DISTINCT n.id AS id, n AS properties, labels ORDER BY id
+      LIMIT 50
+    `, { query });
+
+    const nodes = result.records.map(record => ({
+      id: record.get('id'),
+      properties: record.get('properties').properties,
+      labels: record.get('labels')
+    }));
+
     res.json(nodes);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ error: { code: 'SERVER_ERROR', message: error.message } });
   } finally {
     await session.close();
   }
