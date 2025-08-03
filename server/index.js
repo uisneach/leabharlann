@@ -1155,18 +1155,15 @@ app.get('/search', authenticateToken, async (req, res) => {
     // Search for partial matches on labels, property keys, and values
     const result = await session.run(`
       CALL {
-        // Match nodes by partial label
         CALL db.labels() YIELD label
         WHERE toLower(label) CONTAINS toLower($query) AND label <> 'User'
         MATCH (n) WHERE label IN labels(n)
         RETURN n, labels(n) AS labels, 'label' AS matchType
         UNION
-        // Match nodes by property keys
         MATCH (n:Entity)
         WHERE ANY(key IN keys(n) WHERE toLower(key) CONTAINS toLower($query))
         RETURN n, labels(n) AS labels, 'propertyKey' AS matchType
         UNION
-        // Match nodes by property values using full-text index
         CALL db.index.fulltext.queryNodes('nodeProperties', $query + '*')
         YIELD node AS n, score
         WHERE 'Entity' IN labels(n)
@@ -1190,6 +1187,22 @@ app.get('/search', authenticateToken, async (req, res) => {
     await session.close();
   }
 });
+
+// Create full-text index to help search property values (run once in Neo4j Browser or at startup)
+async function createFullTextIndex() {
+  const session = driver.session();
+  try {
+    await session.run(`
+      CREATE FULLTEXT INDEX nodeProperties IF NOT EXISTS
+      FOR (n:Entity) ON EACH [n.name, n.title, n.description]
+    `);
+  } catch (error) {
+    console.error('Error creating full-text index:', error);
+  } finally {
+    await session.close();
+  }
+}
+createFullTextIndex();
 
 // --- Error Handler ---
 app.use((err, req, res, next) => {
