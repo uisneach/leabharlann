@@ -280,6 +280,26 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
   <script>
+    const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
+
+    // Define special relationships map
+    const specialRels = {
+      incoming: {
+        'EDITION_OF': 'Editions',
+        'VERSION_OF': 'Versions',
+        'DERIVED_FROM': 'Manuscripts',
+        'TRANSLATION_OF': 'Translations',
+        'TRANSLATED': 'Translators',
+        'PUBLISHED': 'Publisher',
+        'WROTE': 'Author',
+        'DISPLAYS': 'Shown On'
+      },
+      outgoing: {
+        'PUBLISHED_BY': 'Publishers',
+        'EDITION_OF': 'Source Text'
+      }
+    };
+
     const params = new URLSearchParams(window.location.search);
     const type = params.get('type');
     const id = params.get('id');
@@ -305,9 +325,8 @@
         if (!nodeRes.ok) throw new Error(`Failed to load node: ${await nodeRes.text()}`);
         const data = await nodeRes.json();
         if (!data) throw new Error('Node not found');
-        nodeId = data.id; // Store nodeId for editing/deleting
+        nodeId = data.id;
 
-        // Fetch relationships
         const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(id)}/relations`, { headers });
         if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
         const relData = await relRes.json();
@@ -334,6 +353,37 @@
       document.querySelectorAll('.delete-rel-btn').forEach(btn => {
         btn.style.display = isAuthenticated ? 'inline-block' : 'none';
       });
+    }
+
+    function createRelListItem(rel, currentNodeId, direction, includeRelType = false) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      const node = rel.node;
+      const label = node.properties.name || node.properties.title || node.properties.nodeId || node.id;
+      const arrow = direction === 'outgoing' ? '→' : '←';
+      a.textContent = includeRelType ? `${rel.type} ${arrow} ${label}` : label;
+      a.href = `info.html?type=${typeFromLabel(node.labels)}&id=${encodeURIComponent(node.id)}`;
+      li.appendChild(a);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn btn-danger btn-sm delete-rel-btn ms-2';
+      deleteBtn.textContent = 'Delete';
+      if (direction === 'incoming') {
+        deleteBtn.dataset.sourceNodeId = node.id;
+        deleteBtn.dataset.targetNodeId = currentNodeId;
+      } else {
+        deleteBtn.dataset.sourceNodeId = currentNodeId;
+        deleteBtn.dataset.targetNodeId = node.id;
+      }
+      deleteBtn.dataset.relType = rel.type;
+      deleteBtn.addEventListener('click', () => deleteRelationship(
+        deleteBtn.dataset.sourceNodeId,
+        deleteBtn.dataset.targetNodeId,
+        deleteBtn.dataset.relType
+      ));
+      li.appendChild(deleteBtn);
+
+      return li;
     }
 
     function renderPage(data) {
@@ -404,57 +454,75 @@
         propertyCount++;
       });
 
-      // Render relationships
-      const outSection = document.getElementById('outgoing-section');
-      const outList = document.getElementById('outgoing-list');
-      outList.innerHTML = '';
-      if (data.outgoing.length) {
-        outSection.style.display = '';
-        data.outgoing.forEach(r => {
-          const li = document.createElement('li');
-          const a = document.createElement('a');
-          const label = r.node.properties.name || r.node.properties.title || r.node.properties.nodeId || r.node.id;
-          a.textContent = `${r.type} → ${label}`;
-          a.href = `info.html?type=${typeFromLabel(r.node.labels)}&id=${encodeURIComponent(r.node.id)}`;
-          li.appendChild(a);
-          const deleteBtn = document.createElement('button');
-          deleteBtn.className = 'btn btn-danger btn-sm delete-rel-btn ms-2';
-          deleteBtn.textContent = 'Delete';
-          deleteBtn.dataset.sourceNodeId = data.id;
-          deleteBtn.dataset.targetNodeId = r.node.id;
-          deleteBtn.dataset.relType = r.type;
-          deleteBtn.addEventListener('click', () => deleteRelationship(data.id, r.node.id, r.type));
-          li.appendChild(deleteBtn);
-          outList.appendChild(li);
-        });
-      } else {
-        outSection.style.display = 'none';
+      // Process relationships
+      const contentDiv = document.querySelector('#content .col-md-8');
+      const outgoingSection = document.getElementById('outgoing-section');
+      const incomingSection = document.getElementById('incoming-section');
+
+      // Clear any existing dynamically added sections
+      const existingSections = contentDiv.querySelectorAll('.rels-section:not(#outgoing-section):not(#incoming-section)');
+      existingSections.forEach(section => section.remove());
+
+      // Handle special incoming relationships
+      for (const [relType, header] of Object.entries(specialRels.incoming)) {
+        const rels = data.incoming.filter(r => r.type === relType);
+        if (rels.length > 0) {
+          const section = document.createElement('div');
+          section.className = 'rels-section';
+          section.innerHTML = `<h3>${header}</h3><ul class="rels-list"></ul>`;
+          const list = section.querySelector('.rels-list');
+          rels.forEach(rel => {
+            const li = createRelListItem(rel, data.id, 'incoming', false);
+            list.appendChild(li);
+          });
+          contentDiv.insertBefore(section, outgoingSection);
+        }
       }
 
-      const inSection = document.getElementById('incoming-section');
-      const inList = document.getElementById('incoming-list');
-      inList.innerHTML = '';
-      if (data.incoming.length) {
-        inSection.style.display = '';
-        data.incoming.forEach(r => {
-          const li = document.createElement('li');
-          const a = document.createElement('a');
-          const label = r.node.properties.name || r.node.properties.title || r.node.properties.nodeId || r.node.id;
-          a.textContent = `${r.type} ← ${label}`;
-          a.href = `info.html?type=${typeFromLabel(r.node.labels)}&id=${encodeURIComponent(r.node.id)}`;
-          li.appendChild(a);
-          const deleteBtn = document.createElement('button');
-          deleteBtn.className = 'btn btn-danger btn-sm delete-rel-btn ms-2';
-          deleteBtn.textContent = 'Delete';
-          deleteBtn.dataset.sourceNodeId = r.node.id;
-          deleteBtn.dataset.targetNodeId = data.id;
-          deleteBtn.dataset.relType = r.type;
-          deleteBtn.addEventListener('click', () => deleteRelationship(r.node.id, data.id, r.type));
-          li.appendChild(deleteBtn);
+      // Handle special outgoing relationships
+      for (const [relType, header] of Object.entries(specialRels.outgoing)) {
+        const rels = data.outgoing.filter(r => r.type === relType);
+        if (rels.length > 0) {
+          const section = document.createElement('div');
+          section.className = 'rels-section';
+          section.innerHTML = `<h3>${header}</h3><ul class="rels-list"></ul>`;
+          const list = section.querySelector('.rels-list');
+          rels.forEach(rel => {
+            const li = createRelListItem(rel, data.id, 'outgoing', false);
+            list.appendChild(li);
+          });
+          contentDiv.insertBefore(section, outgoingSection);
+        }
+      }
+
+      // Handle general incoming relationships
+      const specialIncomingTypes = Object.keys(specialRels.incoming);
+      const generalIncoming = data.incoming.filter(r => !specialIncomingTypes.includes(r.type));
+      if (generalIncoming.length > 0) {
+        incomingSection.style.display = '';
+        const inList = document.getElementById('incoming-list');
+        inList.innerHTML = '';
+        generalIncoming.forEach(rel => {
+          const li = createRelListItem(rel, data.id, 'incoming', true);
           inList.appendChild(li);
         });
       } else {
-        inSection.style.display = 'none';
+        incomingSection.style.display = 'none';
+      }
+
+      // Handle general outgoing relationships
+      const specialOutgoingTypes = Object.keys(specialRels.outgoing);
+      const generalOutgoing = data.outgoing.filter(r => !specialOutgoingTypes.includes(r.type));
+      if (generalOutgoing.length > 0) {
+        outgoingSection.style.display = '';
+        const outList = document.getElementById('outgoing-list');
+        outList.innerHTML = '';
+        generalOutgoing.forEach(rel => {
+          const li = createRelListItem(rel, data.id, 'outgoing', true);
+          outList.appendChild(li);
+        });
+      } else {
+        outgoingSection.style.display = 'none';
       }
     }
 
@@ -486,7 +554,6 @@
         });
         if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete property');
         const data = await response.json();
-        // Fetch updated relationships
         const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -515,7 +582,6 @@
           body: JSON.stringify({ sourceNodeId, targetNodeId, relType })
         });
         if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete relationship');
-        // Reload node data
         const nodeRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -619,7 +685,6 @@
         document.getElementById('deleteNodeBtn').style.display = 'block';
         document.getElementById('propertiesDisplay').style.display = 'block';
 
-        // Fetch updated relationships
         const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
