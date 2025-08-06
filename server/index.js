@@ -1086,116 +1086,73 @@ app.delete('/relation/:id/property/:key', requireAuth, async (req, res, next) =>
  */
 app.get('/search', async (req, res) => {
   const { query, label } = req.query;
-  // Validate
   if (!query || typeof query !== 'string' || query.length < 2) {
     return res.status(400).json({
-      error: {
-        code:    'INVALID_QUERY',
-        message: 'Query must be a string with at least 2 characters'
-      }
+      error: { code: 'INVALID_QUERY',
+               message: 'Query must be a string with at least 2 characters' }
     });
   }
-  if (label && typeof label !== 'string') {
+  if (label !== undefined && typeof label !== 'string') {
     return res.status(400).json({
-      error: {
-        code:    'INVALID_LABEL',
-        message: 'Label, if provided, must be a string'
-      }
+      error: { code: 'INVALID_LABEL',
+               message: 'Label, if provided, must be a string' }
     });
   }
 
   const session = driver.session();
   try {
-    // Choose one of two Cypher queries based on presence of label
-    const cypherBroad = `
+    // Always run the full deep search
+    const cypher = `
       CALL {
-        // 1) match on labels
         CALL db.labels() YIELD label AS lbl
         WHERE toLower(lbl) CONTAINS toLower($query) AND lbl <> 'User'
-        MATCH (n)
-        WHERE lbl IN labels(n)
+        MATCH (n) WHERE lbl IN labels(n)
         RETURN n, labels(n) AS labels
 
         UNION
 
-        // 2) match on property keys
         MATCH (n:Entity)
         WHERE ANY(key IN keys(n) WHERE toLower(key) CONTAINS toLower($query))
         RETURN n, labels(n) AS labels
 
         UNION
 
-        // 3) match on indexed property values
         CALL db.index.fulltext.queryNodes('nodeProperties', $query + '*')
         YIELD node AS n
         WHERE 'Entity' IN labels(n)
         RETURN n, labels(n) AS labels
       }
       RETURN DISTINCT
-        n.nodeId       AS id,
-        properties(n)  AS properties,
-        labels
-      ORDER BY id
-      LIMIT 50
-    `;
-    const cypherScoped = `
-      CALL {
-        // 1) match on labels within the given label
-        CALL db.labels() YIELD label AS lbl
-        WHERE toLower(lbl) CONTAINS toLower($query) AND lbl = $label
-        MATCH (n:${label})
-        RETURN n, labels(n) AS labels
-
-        UNION
-
-        // 2) match on property keys within the given label
-        MATCH (n:${label})
-        WHERE ANY(key IN keys(n) WHERE toLower(key) CONTAINS toLower($query))
-        RETURN n, labels(n) AS labels
-
-        UNION
-
-        // 3) match on indexed property values within the given label
-        CALL db.index.fulltext.queryNodes('nodeProperties', $query + '*')
-        YIELD node AS n
-        WHERE $label IN labels(n)
-        RETURN n, labels(n) AS labels
-      }
-      RETURN DISTINCT
-        n.nodeId       AS id,
-        properties(n)  AS properties,
+        n.nodeId      AS id,
+        properties(n) AS properties,
         labels
       ORDER BY id
       LIMIT 50
     `;
 
-    console.log("Label: " + label);
-
-    const result = await session.run(
-      label ? cypherScoped : cypherBroad,
-      { query, label }
-    );
-
-    const nodes = result.records.map(record => ({
+    const result = await session.run(cypher, { query });
+    let nodes = result.records.map(record => ({
       id:         record.get('id'),
       labels:     record.get('labels'),
       properties: record.get('properties')
     }));
 
-    res.json(nodes);
+    // If a label was specified, filter results by label
+    if (label) {
+      nodes = nodes.filter(node => node.labels.includes(label));
+    }
 
+    res.json(nodes);
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({
-      error: {
-        code:    'SERVER_ERROR',
-        message: error.message
-      }
+      error: { code: 'SERVER_ERROR', message: error.message }
     });
   } finally {
     await session.close();
   }
 });
+
 
 // Create full‐text index to help search property values (run once at startup)
 async function createFullTextIndex() {

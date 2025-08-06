@@ -371,7 +371,7 @@
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
         const response = await fetch(
-          `${API_BASE}/nodes/search?label=${encodeURIComponent(toLabel)}&query=${encodeURIComponent(query)}`,
+          `${API_BASE}/nodes/search?label=${encodeURIComponent(toLabel)}&query='${encodeURIComponent(query)}'`,
           { headers }
         );
 
