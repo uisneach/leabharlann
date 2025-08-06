@@ -853,7 +853,6 @@ app.get('/nodes/:id/relations', async (req, res, next) => {
   }
 });
 
-
 // --- Delete Relationship ---
 /**
  * @openapi
@@ -1086,7 +1085,8 @@ app.delete('/relation/:id/property/:key', requireAuth, async (req, res, next) =>
  *       '500': …
  */
 app.get('/search', async (req, res) => {
-  const { query } = req.query;
+  const { query, label } = req.query;
+  // Validate
   if (!query || typeof query !== 'string' || query.length < 2) {
     return res.status(400).json({
       error: {
@@ -1095,31 +1095,39 @@ app.get('/search', async (req, res) => {
       }
     });
   }
+  if (label && typeof label !== 'string') {
+    return res.status(400).json({
+      error: {
+        code:    'INVALID_LABEL',
+        message: 'Label, if provided, must be a string'
+      }
+    });
+  }
 
   const session = driver.session();
   try {
-    const result = await session.run(
-      `
+    // Choose one of two Cypher queries based on presence of label
+    const cypherBroad = `
       CALL {
-        // match on labels
-        CALL db.labels() YIELD label
-        WHERE toLower(label) CONTAINS toLower($query) AND label <> 'User'
+        // 1) match on labels
+        CALL db.labels() YIELD label AS lbl
+        WHERE toLower(lbl) CONTAINS toLower($query) AND lbl <> 'User'
         MATCH (n)
-        WHERE label IN labels(n)
+        WHERE lbl IN labels(n)
         RETURN n, labels(n) AS labels
 
         UNION
 
-        // match on property keys
+        // 2) match on property keys
         MATCH (n:Entity)
         WHERE ANY(key IN keys(n) WHERE toLower(key) CONTAINS toLower($query))
         RETURN n, labels(n) AS labels
 
         UNION
 
-        // match on indexed property values
+        // 3) match on indexed property values
         CALL db.index.fulltext.queryNodes('nodeProperties', $query + '*')
-        YIELD node AS n, score
+        YIELD node AS n
         WHERE 'Entity' IN labels(n)
         RETURN n, labels(n) AS labels
       }
@@ -1129,8 +1137,41 @@ app.get('/search', async (req, res) => {
         labels
       ORDER BY id
       LIMIT 50
-      `,
-      { query }
+    `;
+    const cypherScoped = `
+      CALL {
+        // 1) match on labels within the given label
+        CALL db.labels() YIELD label AS lbl
+        WHERE toLower(lbl) CONTAINS toLower($query) AND lbl = $label
+        MATCH (n:\`${label}\`)
+        RETURN n, labels(n) AS labels
+
+        UNION
+
+        // 2) match on property keys within the given label
+        MATCH (n:\`${label}\`)
+        WHERE ANY(key IN keys(n) WHERE toLower(key) CONTAINS toLower($query))
+        RETURN n, labels(n) AS labels
+
+        UNION
+
+        // 3) match on indexed property values within the given label
+        CALL db.index.fulltext.queryNodes('nodeProperties', $query + '*')
+        YIELD node AS n
+        WHERE $label IN labels(n)
+        RETURN n, labels(n) AS labels
+      }
+      RETURN DISTINCT
+        n.nodeId       AS id,
+        properties(n)  AS properties,
+        labels
+      ORDER BY id
+      LIMIT 50
+    `;
+
+    const result = await session.run(
+      label ? cypherScoped : cypherBroad,
+      { query, label }
     );
 
     const nodes = result.records.map(record => ({
@@ -1140,6 +1181,7 @@ app.get('/search', async (req, res) => {
     }));
 
     res.json(nodes);
+
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({
@@ -1152,8 +1194,6 @@ app.get('/search', async (req, res) => {
     await session.close();
   }
 });
-
-
 
 // Create full‐text index to help search property values (run once at startup)
 async function createFullTextIndex() {
