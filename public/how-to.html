@@ -245,8 +245,6 @@
     <h1 class="mb-4">How to Use An Leabharlann Ghealach</h1>
     <p>Welcome to <strong>An Leabharlann Ghealach</strong>, a database for Irish and Celtic source texts. This website will allow users to log and cite texts, keep track of secondary analyses, and discover new texts in the network. An Leabharlann will help keep track of all editions and translations of a text and where they can be found online.</p>
 
-    <h5>Our goal is to collect all known Irish and Celtic source texts by collecting references to where they can be found online, and to collect commentary and debate on those texts.</h5>
-
     <h2 class="mt-5">Directory</h2>
     <ul>
       <li><a href="#neo4j">Built on Neo4j</a></li>
@@ -298,7 +296,9 @@
 
     <h2 id="database-layout" class="mt-5">2. How is This Database Laid Out?</h2>
     <p>Due to the complexity of relationships in the humanities, no rigid structure could ever capture the unruly relationships of a humanities database without itself becoming unruly. But Neo4j allows users to set relationships that could be unique, as well as relationships that are extremely common. To capture all of these, users can create many different labels to suit their needs.</p>
-    <strong>Node Types (Labels)</strong>:
+    
+    <p>A node consists of a <strong>label</strong> and a list of <strong>properties</strong> and their values.</p>
+    <strong>Node Labels</strong>:
     <ul>
       <li><strong>Author</strong>: Represents authors with properties like 'name' (e.g., 'name: "Homer"').</li>
       <li><strong>Text</strong>: Represents works (e.g., books, poems) with properties like 'title'.</li>
@@ -329,7 +329,7 @@
       <li><strong>Book</strong>: Represents physical books, and no other medium. A Book is always also an Edition, with added properties like 'ISBN'.</li>
       <li><strong>Webpage</strong>: Represents a single webpage, displaying a Text's contents, a page of a manuscript, or anything else on a single webpage.</li>
       <li><strong>Website</strong>: Represents a website hosting many webpages or which is otherwise prominent, e.g. the Corpus of Electronic Texts (CELT) which hosts dozens of valuable webpages, or the British Museum (www.britishmuseum.org), which hosts many webpages for individual artifacts.</li>
-      <li>& c. ...</li>
+      <li>Etc...</li>
     </ul>
     <strong>Properties</strong>:
     <ul>
@@ -339,50 +339,18 @@
       </li>
       <li><strong>Relationships</strong>:
         <ul>
-          <li>Examples include `WROTE` (Author to Text), `PUBLISHED` (Publisher to Edition), or custom types you define.</li>
-          <li>Relationships connect nodes directionally (e.g., Author → Text) and are displayed as incoming or outgoing on node details pages.</li>
+          <li>Examples include `WROTE` (Author to Text), `PUBLISHED` (Publisher to Edition), or custom types the user can define.</li>
+          <li>Relationships connect nodes directionally (e.g., Author → Text) and are displayed as related nodes on info pages.</li>
         </ul>
       </li>
-      <li><strong>Constraints</strong>: The database enforces a uniqueness constraint on the 'nodeId' property to ensure each node has a unique identifier.</li>
+      <li><strong>Constraints</strong>: The database enforces a uniqueness or existence constraint in certain vital node properties. For example, every node must have a unique 'nodeId' property to ensure each node has a valid identifier, and all Author nodes must have a 'name' property, etc...</li>
     </ul>
-    <p>This structure allows you to explore connections, such as which authors wrote which texts or which editions belong to a text.</p>
+    <p>This structure allows a user to create a flexible layout that captures many possible interactions between texts and their authors, publishers, versions, manuscripts, etc., in a way that is navigable and understandable.</p>
 
-    <h2 id="data-inclusion" class="mt-5">3. What Can I Include in the Database?</h2>
-    <p>You can add a wide variety of literary and related data to the database, as long as it fits the graph structure.</p>
-    <ul>
-      <li><strong>Nodes</strong>:
-        <ul>
-          <li>Create nodes for entities like Authors, Texts, Editions, Publishers, Genres, or any custom category (e.g., `Series`, `Library`).</li>
-          <li>Add properties to describe nodes, such as `name`, `title`, `publication_year`, `isbn`, or custom fields like `genre` or `language`.</li>
-          <li>Properties must use valid names (letters, numbers, underscores) and cannot include reserved names like `nodeId` or `createdBy`.</li>
-        </ul>
-      </li>
-      <li><strong>Relationships</strong>:
-        <ul>
-          <li>Define relationships between nodes, such as `WROTE` (Author to Text), `PUBLISHED_BY` (Edition to Publisher), or custom types like `TRANSLATED`.</li>
-          <li>Relationships are directional and must connect existing nodes.</li>
-        </ul>
-      </li>
-      <li><strong>Examples</strong>:
-        <ul>
-          <li>Add an Author node (`name: "J.R.R. Tolkien"`) and a Text node (`title: "The Lord of the Rings"`), then create a `WROTE` relationship between them.</li>
-          <li>Create an Edition node (`title: "The Hobbit, 1937 Edition"`) and link it to a Text node with a `HAS_EDITION` relationship.</li>
-          <li>Add a Publisher node and connect it to an Edition with a `PUBLISHED` relationship.</li>
-        </ul>
-      </li>
-      <li><strong>Limitations</strong>:
-        <ul>
-          <li>You can only edit or delete nodes/relationships you created, unless you’re an admin.</li>
-          <li>The `User` label is reserved for authentication and not displayed in the homepage’s column options.</li>
-        </ul>
-      </li>
-    </ul>
-    <p>This flexibility allows you to model complex literary relationships while maintaining a structured database.</p>
-
-    <h2 id="login" class="mt-5">4. Logging In and Registering</h2>
+    <h2 id="login" class="mt-5">3. Logging In and Registering</h2>
     <p>Many features, such as creating, editing, or deleting content, require you to be logged in.</p>
     <ol>
-      <li><strong>Access the Login Modal</strong>: Click the "Account" link in the top-right corner of any page.</li>
+      <li><strong>Access the Login Form</strong>: Click the "Account" link in the top-right corner of any page.</li>
       <li><strong>Log In</strong>:
         <ul>
           <li>Enter your username and password in the login form.</li>
@@ -392,15 +360,15 @@
       </li>
       <li><strong>Register</strong>:
         <ul>
-          <li>Click the "Register" link in the login modal to go to the registration page.</li>
+          <li>Click the "Register" link in the login form to go to the registration page.</li>
           <li>Fill out the form with a unique username and password, then submit.</li>
-          <li>Return to the login modal to sign in with your new credentials.</li>
+          <li>Return to the login form to sign in with your new credentials.</li>
         </ul>
       </li>
       <li><strong>Log Out</strong>: Click your username in the top-right corner and select "Log out" from the dropdown.</li>
     </ol>
 
-    <h2 id="homepage" class="mt-5">5. Exploring the Homepage</h2>
+    <h2 id="homepage" class="mt-5">4. Exploring the Homepage</h2>
     <p>The homepage (<a href="index.html">index.html</a>) displays lists of nodes organized by labels, such as Authors, Texts, and Editions.</p>
     <ul>
       <li><strong>Default Columns</strong>: By default, you’ll see three columns for Authors, Texts, and Editions, each listing nodes of that type.</li>
@@ -409,16 +377,15 @@
       <li><strong>Customize Columns</strong>: Add or remove columns to display different node types (see <a href="#columns">Customizing Homepage Columns</a>).</li>
     </ul>
 
-    <h2 id="search" class="mt-5">6. Searching for Nodes</h2>
+    <h2 id="search" class="mt-5">5. Searching for Nodes</h2>
     <p>Use the search bar at the top of any page to find nodes.</p>
     <ol>
       <li>Enter a search term (e.g., an author’s name) in the search bar.</li>
       <li>Press the "Search" button or hit Enter.</li>
       <li>If a matching Author node is found, you’ll be redirected to its details page. Otherwise, an error message like "No results found" will appear.</li>
-      <li><strong>Note</strong>: Search currently looks for Author nodes by name. For other node types, navigate through the homepage or create relationships.</li>
     </ol>
 
-    <h2 id="node-details" class="mt-5">7. Viewing Node Details</h2>
+    <h2 id="node-details" class="mt-5">6. Viewing Node Details</h2>
     <p>The node info page (<a href="info.html">info.html</a>) displays details about a specific node, such as an Author, Text, or Edition.</p>
     <ul>
       <li><strong>Node Properties</strong>: View the node’s properties (e.g., name, title) in a table on the right.</li>
@@ -432,7 +399,7 @@
       </li>
     </ul>
 
-    <h2 id="create-node" class="mt-5">8. Creating a New Node</h2>
+    <h2 id="create-node" class="mt-5">7. Creating a New Node</h2>
     <p>Authenticated users can create new nodes (e.g., Authors, Texts) from the homepage.</p>
     <ol>
       <li>Log in (see <a href="#login">Logging In</a>).</li>
@@ -448,7 +415,7 @@
       <li><strong>Error Handling</strong>: If you see an error (e.g., "Invalid label format"), ensure labels and properties use only letters, numbers, or underscores, and avoid reserved names like `nodeId` or `createdBy`.</li>
     </ol>
 
-    <h2 id="edit-node" class="mt-5">9. Editing Node Properties</h2>
+    <h2 id="edit-node" class="mt-5">8. Editing Node Properties</h2>
     <p>Modify a node’s properties from its details page.</p>
     <ol>
       <li>Log in and navigate to a node’s details page (e.g., via search or homepage links).</li>
@@ -464,7 +431,7 @@
       <li><strong>Error Handling</strong>: If you see an error (e.g., "Property names can only contain letters, numbers, underscores"), adjust the property name and try again.</li>
     </ol>
 
-    <h2 id="delete-node" class="mt-5">10. Deleting a Node</h2>
+    <h2 id="delete-node" class="mt-5">9. Deleting a Node</h2>
     <p>Delete a node and all its relationships from its details page.</p>
     <ol>
       <li>Log in and navigate to the node’s details page.</li>
@@ -474,7 +441,7 @@
       <li><strong>Note</strong>: Only the node’s creator or an admin can delete it.</li>
     </ol>
 
-    <h2 id="relationships" class="mt-5">11. Managing Relationships</h2>
+    <h2 id="relationships" class="mt-5">10. Managing Relationships</h2>
     <p>Create or delete relationships between nodes on the node details page.</p>
     <ul>
       <li><strong>Create a Relationship</strong>:
@@ -495,7 +462,7 @@
       </li>
     </ul>
 
-    <h2 id="columns" class="mt-5">12. Customizing Homepage Columns</h2>
+    <h2 id="columns" class="mt-5">11. Customizing Homepage Columns</h2>
     <p>Adjust the node types displayed on the homepage.</p>
     <ol>
       <li><strong>View Default Columns</strong>: The homepage shows Authors, Texts, and Editions by default.</li>
@@ -515,13 +482,13 @@
       <li><strong>Note</strong>: The homepage always shows at least three columns (Authors, Texts, Editions) to maintain a consistent layout.</li>
     </ol>
 
-    <h2 id="troubleshooting" class="mt-5">13. Troubleshooting</h2>
+    <h2 id="troubleshooting" class="mt-5">12. Troubleshooting</h2>
     <ul>
       <li><strong>Login Issues</strong>: Ensure your username and password are correct. If you can’t log in, try registering a new account or resetting your password (if available).</li>
       <li><strong>Search Returns No Results</strong>: Check your spelling or try broader terms. Search currently targets Author names.</li>
       <li><strong>Permission Errors</strong>: You can only edit/delete nodes or relationships you created, unless you’re an admin.</li>
       <li><strong>Page Not Loading</strong>: If you see a "Loading…" message or errors, check your internet connection or try refreshing. The app is hosted on Render’s free tier, so occasional delays may occur.</li>
-      <li><strong>Contact Support</strong>: If issues persist, contact the administrator (details on the registration page, if provided).</li>
+      <li><strong>Contact Support</strong>: If issues persist, contact the administrator (@ogmios on Twitter).</li>
     </ul>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
