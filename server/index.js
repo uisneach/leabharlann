@@ -1143,13 +1143,13 @@ app.get('/search', async (req, res) => {
         // 1) match on labels within the given label
         CALL db.labels() YIELD label AS lbl
         WHERE toLower(lbl) CONTAINS toLower($query) AND lbl = $label
-        MATCH (n:\`${label}\`)
+        MATCH (n:${label})
         RETURN n, labels(n) AS labels
 
         UNION
 
         // 2) match on property keys within the given label
-        MATCH (n:\`${label}\`)
+        MATCH (n:${label})
         WHERE ANY(key IN keys(n) WHERE toLower(key) CONTAINS toLower($query))
         RETURN n, labels(n) AS labels
 
@@ -1168,6 +1168,8 @@ app.get('/search', async (req, res) => {
       ORDER BY id
       LIMIT 50
     `;
+
+    console.log("Label: " + label);
 
     const result = await session.run(
       label ? cypherScoped : cypherBroad,

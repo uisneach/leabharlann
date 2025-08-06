@@ -352,57 +352,57 @@
       }
     }
 
-document.getElementById('toNodeSearch').addEventListener('input', async e => {
-  const query = e.target.value.trim();
-  const toLabel = document.getElementById('toLabel').value.trim();
-  const toProperty = document.getElementById('toProperty').value;
-  const resultsList = document.getElementById('searchResults');
-  resultsList.innerHTML = '';
-  resultsList.style.display = 'none';
-  document.getElementById('toId').value = '';
-  isNodeValid = false;
-  document.getElementById('nodeStatus').textContent = '';
-  document.getElementById('submitButton').disabled = true;
+    document.getElementById('toNodeSearch').addEventListener('input', async e => {
+      const query = e.target.value.trim();
+      const toLabel = document.getElementById('toLabel').value.trim();
+      const toProperty = document.getElementById('toProperty').value;
+      const resultsList = document.getElementById('searchResults');
+      resultsList.innerHTML = '';
+      resultsList.style.display = 'none';
+      document.getElementById('toId').value = '';
+      isNodeValid = false;
+      document.getElementById('nodeStatus').textContent = '';
+      document.getElementById('submitButton').disabled = true;
 
-  if (query.length < 2 || !toLabel || !toProperty) return;
+      if (query.length < 2 || !toLabel || !toProperty) return;
 
-  try {
-    const token = localStorage.getItem('token');
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      try {
+        const token = localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-    const response = await fetch(
-      `${API_BASE}/nodes/search?label=${encodeURIComponent(toLabel)}&query=${encodeURIComponent(query)}`,
-      { headers }
-    );
+        const response = await fetch(
+          `${API_BASE}/nodes/search?label=${encodeURIComponent(toLabel)}&query=${encodeURIComponent(query)}`,
+          { headers }
+        );
 
-    if (!response.ok) {
-      throw new Error(`Search failed with status: ${response.status}`);
-    }
+        if (!response.ok) {
+          throw new Error(`Search failed with status: ${response.status}`);
+        }
 
-    const nodes = await response.json();
+        const nodes = await response.json();
 
-    if (nodes.length > 0) {
-      nodes.forEach(node => {
-        const li = document.createElement('li');
-        li.className = 'list-group-item list-group-item-action';
-        li.textContent = node.properties?.[toProperty] || node.properties?.name || node.properties?.title || node.id;
-        li.addEventListener('click', async () => {
-          document.getElementById('toId').value = node.id;
-          document.getElementById('toNodeSearch').value = li.textContent;
-          resultsList.innerHTML = '';
-          resultsList.style.display = 'none';
-          await validateTargetNode(node.id, toLabel);
-        });
-        resultsList.appendChild(li);
-      });
-      resultsList.style.display = 'block';
-    }
-  } catch (error) {
-    console.error('Search error:', error);
-    document.getElementById('errorMessage').style.display = 'block';
-    document.getElementById('errorMessage').textContent = `Search failed: ${error.message}`;
-  }
-});
+        if (nodes.length > 0) {
+          nodes.forEach(node => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item list-group-item-action';
+            li.textContent = node.properties?.[toProperty] || node.properties?.name || node.properties?.title || node.id;
+            li.addEventListener('click', async () => {
+              document.getElementById('toId').value = node.id;
+              document.getElementById('toNodeSearch').value = li.textContent;
+              resultsList.innerHTML = '';
+              resultsList.style.display = 'none';
+              await validateTargetNode(node.id, toLabel);
+            });
+            resultsList.appendChild(li);
+          });
+          resultsList.style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        document.getElementById('errorMessage').style.display = 'block';
+        document.getElementById('errorMessage').textContent = `Search failed: ${error.message}`;
+      }
+    });
 
     document.getElementById('toLabel').addEventListener('input', () => {
       document.getElementById('toNodeSearch').value = '';
