@@ -58,7 +58,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div id="searchResults" class="list-group"></div>
+            <div id="searchResultsHeader" class="list-group"></div>
           </div>
         </div>
       </div>
@@ -207,7 +207,7 @@
       }
 
       function displaySearchResults(results, query) {
-        const searchResults = document.getElementById('searchResults');
+        const searchResults = document.getElementById('searchResultsHeader');
         searchResults.innerHTML = '';
         if (results.length === 0) {
           searchResults.innerHTML = '<p class="text-muted">No results found for "' + query + '"</p>';
@@ -353,10 +353,12 @@
     }
 
     document.getElementById('toNodeSearch').addEventListener('input', async e => {
-      const query = e.target.value.trim();
-      const toLabel = document.getElementById('toLabel').value.trim();
+      const query      = e.target.value.trim();
+      const toLabel    = document.getElementById('toLabel').value.trim();
       const toProperty = document.getElementById('toProperty').value;
       const resultsList = document.getElementById('searchResults');
+
+      // reset state
       resultsList.innerHTML = '';
       resultsList.style.display = 'none';
       document.getElementById('toId').value = '';
@@ -364,43 +366,60 @@
       document.getElementById('nodeStatus').textContent = '';
       document.getElementById('submitButton').disabled = true;
 
-      if (query.length < 2 || !toLabel || !toProperty) return;
+      // don’t search on too-short queries or missing config
+      if (query.length < 2 || !toLabel || !toProperty) {
+        return;
+      }
 
       try {
-        const token = localStorage.getItem('token');
+        const token   = localStorage.getItem('token');
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-        const response = await fetch(
-          `${API_BASE}/nodes/search?label=${encodeURIComponent(toLabel)}&query='${encodeURIComponent(query)}'`,
-          { headers }
-        );
+        // ✂️ Removed the extra single-quotes around the query
+        const url = `${API_BASE}/search?label=${encodeURIComponent(toLabel)}&query=${encodeURIComponent(query)}`;
+        console.debug('Searching URL:', url);
 
+        const response = await fetch(url, { headers });
         if (!response.ok) {
           throw new Error(`Search failed with status: ${response.status}`);
         }
 
         const nodes = await response.json();
+        console.debug('Search results:', nodes);
 
         if (nodes.length > 0) {
+          resultsList.innerHTML = '';
           nodes.forEach(node => {
+            console.debug('Rendering node:', node);
             const li = document.createElement('li');
             li.className = 'list-group-item list-group-item-action';
-            li.textContent = node.properties?.[toProperty] || node.properties?.name || node.properties?.title || node.id;
+            li.textContent =
+              node.properties?.[toProperty] ||
+              node.properties?.name ||
+              node.properties?.title ||
+              node.id;
+
             li.addEventListener('click', async () => {
+              console.debug('Clicked node:', node.id);
               document.getElementById('toId').value = node.id;
               document.getElementById('toNodeSearch').value = li.textContent;
               resultsList.innerHTML = '';
               resultsList.style.display = 'none';
               await validateTargetNode(node.id, toLabel);
             });
+
             resultsList.appendChild(li);
           });
+
+          // finally un-hide the UL
+          console.debug('Showing resultsList');
           resultsList.style.display = 'block';
         }
       } catch (error) {
         console.error('Search error:', error);
-        document.getElementById('errorMessage').style.display = 'block';
-        document.getElementById('errorMessage').textContent = `Search failed: ${error.message}`;
+        const errEl = document.getElementById('errorMessage');
+        errEl.style.display = 'block';
+        errEl.textContent = `Search failed: ${error.message}`;
       }
     });
 
