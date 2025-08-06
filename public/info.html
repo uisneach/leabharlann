@@ -233,8 +233,8 @@
     </script>
   </header>
   <div id="content" class="row">
+    <h1 class="page-title" id="page-title">Loading…</h1>
     <div class="col-md-8">
-      <h1 class="page-title" id="page-title">Loading…</h1>
       <div class="mt-3">
         <button id="editPropertiesBtn" class="btn btn-primary me-2" style="display: none;">Edit Properties</button>
         <button id="deleteNodeBtn" class="btn btn-danger" style="display: none;">Delete Node</button>
@@ -273,7 +273,7 @@
     </div>
     <aside class="col-md-4">
       <div class="infobox" id="infobox">
-        <h4>Details</h4>
+        <h4>Related Pages</h4>
         <table id="info-table"></table>
       </div>
     </aside>
@@ -292,11 +292,17 @@
         'TRANSLATED': 'Translators',
         'PUBLISHED': 'Publisher',
         'WROTE': 'Author',
-        'DISPLAYS': 'Shown On'
+        'DISPLAYS': 'Displayed On',
+        'PUBLISHED_IN': 'Published'
       },
       outgoing: {
         'PUBLISHED_BY': 'Publishers',
-        'EDITION_OF': 'Source Text'
+        'EDITION_OF': 'Source Text',
+        'VERSION_OF': 'Published In',
+        'DERIVED_FROM': 'Derived From',
+        'WROTE': 'Wrote',
+        'PUBLISHED_IN': 'Published In',
+        'TRANSLATED': 'Translated'
       }
     };
 
@@ -392,51 +398,73 @@
       document.getElementById('createRelationshipBtn').href = `relationship.html?fromType=${encodeURIComponent(type)}&fromId=${encodeURIComponent(data.id)}`;
       const infoTable = document.getElementById('info-table');
       const propertiesDisplay = document.getElementById('propertiesDisplay');
+      const dataSection = document.createElement('div');
+      const dataTable = document.createElement('table');
+
       infoTable.innerHTML = '';
       propertiesDisplay.innerHTML = '';
-      Object.entries(data.properties).forEach(([k, v]) => {
-        const tr = document.createElement('tr');
-        const th = document.createElement('th');
-        th.textContent = k;
-        const td = document.createElement('td');
-        if (Array.isArray(v)) {
-          v.forEach((item, idx) => {
-            if (isUrl(item)) {
+      Object.entries(data.properties).forEach(([property, value]) => {
+        // For certain properties we expect to be large or important, move them to the middle section of the page.
+        if (['description', 'analysis'].includes(property)) {
+          const section = document.createElement('div');
+          section.className = 'data-section';
+          section.innerHTML = `<h3 class="section-header">${cleanString(property)}</h3><p>${value}</p>`;
+          propertiesDisplay.appendChild(section);
+        } else {
+          // For all other values, which are unimportant by comparison, move to a section at the bottom of the page.
+          const tr = document.createElement('tr');
+          const th = document.createElement('th');
+          th.textContent = cleanString(property);
+          const td = document.createElement('td');
+          if (Array.isArray(value)) {
+            value.forEach((item, idx) => {
+              if (isUrl(item)) {
+                const a = document.createElement('a');
+                a.href = item;
+                a.textContent = item;
+                a.target = '_blank';
+                td.appendChild(a);
+              } else {
+                td.appendChild(document.createTextNode(item));
+              }
+              if (idx < value.length - 1)
+                td.appendChild(document.createTextNode(', '));
+            });
+          } else {
+            if (typeof value === 'string' && isUrl(value)) {
               const a = document.createElement('a');
-              a.href = item;
-              a.textContent = item;
+              a.href = value;
+              a.textContent = value;
               a.target = '_blank';
               td.appendChild(a);
             } else {
-              td.appendChild(document.createTextNode(item));
+              td.textContent = value || '';
             }
-            if (idx < v.length - 1) td.appendChild(document.createTextNode(', '));
-          });
-        } else {
-          if (typeof v === 'string' && isUrl(v)) {
-            const a = document.createElement('a');
-            a.href = v;
-            a.textContent = v;
-            a.target = '_blank';
-            td.appendChild(a);
-          } else {
-            td.textContent = v || '';
           }
+          if (property !== 'nodeId' && property !== 'createdBy') {
+            const deleteTd = document.createElement('td');
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn btn-danger btn-sm delete-property-btn';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.dataset.key = property;
+            deleteBtn.addEventListener('click', () => deleteProperty(property));
+            deleteTd.appendChild(deleteBtn);
+            tr.appendChild(deleteTd);
+          }
+          tr.prepend(td);
+          tr.prepend(th);
+          dataTable.appendChild(tr);
         }
-        if (k !== 'nodeId' && k !== 'createdBy') {
-          const deleteTd = document.createElement('td');
-          const deleteBtn = document.createElement('button');
-          deleteBtn.className = 'btn btn-danger btn-sm delete-property-btn';
-          deleteBtn.textContent = 'Delete';
-          deleteBtn.dataset.key = k;
-          deleteBtn.addEventListener('click', () => deleteProperty(k));
-          deleteTd.appendChild(deleteBtn);
-          tr.appendChild(deleteTd);
-        }
-        tr.appendChild(th);
-        tr.appendChild(td);
-        infoTable.appendChild(tr);
       });
+
+      if (dataTable.childElementCount > 0) {
+        const header = document.createElement('h3');
+        header.className = 'section-header';
+        header.textContent = 'Details';
+        dataSection.appendChild(header);
+        dataSection.appendChild(dataTable);
+        propertiesDisplay.appendChild(dataSection);
+      }
 
       // Populate edit form
       const propertiesTbody = document.getElementById('properties');
@@ -458,6 +486,7 @@
       const contentDiv = document.querySelector('#content .col-md-8');
       const outgoingSection = document.getElementById('outgoing-section');
       const incomingSection = document.getElementById('incoming-section');
+      const infoBox = document.getElementById('infobox');
 
       // Clear any existing dynamically added sections
       const existingSections = contentDiv.querySelectorAll('.rels-section:not(#outgoing-section):not(#incoming-section)');
@@ -475,7 +504,7 @@
             const li = createRelListItem(rel, data.id, 'incoming', false);
             list.appendChild(li);
           });
-          contentDiv.insertBefore(section, outgoingSection);
+          infoBox.insertBefore(section, infoTable);
         }
       }
 
@@ -491,7 +520,7 @@
             const li = createRelListItem(rel, data.id, 'outgoing', false);
             list.appendChild(li);
           });
-          contentDiv.insertBefore(section, outgoingSection);
+          infoBox.insertBefore(section, infoTable);
         }
       }
 
@@ -524,6 +553,10 @@
       } else {
         outgoingSection.style.display = 'none';
       }
+    }
+
+    function buildDetailsPanel(data) {
+
     }
 
     async function deleteNode() {
@@ -613,6 +646,19 @@
       } catch {
         return false;
       }
+    }
+
+    function cleanString(input) {
+      return (
+        input
+          // replace underscore or dash with space
+          .replace(/[_-]+/g, ' ')
+          // collapse multiple spaces
+          .replace(/\s+/g, ' ')
+          .trim()
+          // capitalize first letter of each word
+          .replace(/\b\w/g, (ch) => ch.toUpperCase())
+      );
     }
 
     document.getElementById('editPropertiesBtn').addEventListener('click', () => {

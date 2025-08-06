@@ -25,7 +25,7 @@ header .navbar-brand {
   align-items: center;
 }
 header .navbar-nav .nav-link .navbar-text { color: white; }
-#content {
+#content, #welcome-message {
   margin: 1rem auto;
   max-width: 1200px;
   background: white;
@@ -79,8 +79,7 @@ h1.page-title {
   table-layout: fixed;
 }
 
-.infobox th,
-.infobox td {
+ th, td {
   padding-bottom: 0.3rem;
   white-space: normal;
   overflow-wrap: break-word;
@@ -88,7 +87,7 @@ h1.page-title {
   word-break: break-word;
 }
 
-.infobox th {
+th {
   text-align: left;
   vertical-align: top;
   padding-right: 0.5rem;
@@ -98,7 +97,6 @@ h1.page-title {
 /* Relationships section */
 .rels-section h3 {
   margin-top: 1.5rem;
-  border-bottom: 1px solid #ddd;
   padding-bottom: 0.3rem;
   font-size: 1.25rem;
 }
@@ -152,4 +150,11 @@ header img {
 }
 img {
   margin-bottom: 20px;
+}
+
+.section-header {
+  margin-top: 1.5rem;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.3rem;
+  font-size: 1.25rem;
 }
