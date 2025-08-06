@@ -358,7 +358,6 @@
       const toProperty = document.getElementById('toProperty').value;
       const resultsList = document.getElementById('searchResults');
 
-      // reset state
       resultsList.innerHTML = '';
       resultsList.style.display = 'none';
       document.getElementById('toId').value = '';
@@ -366,7 +365,6 @@
       document.getElementById('nodeStatus').textContent = '';
       document.getElementById('submitButton').disabled = true;
 
-      // don’t search on too-short queries or missing config
       if (query.length < 2 || !toLabel || !toProperty) {
         return;
       }
@@ -375,7 +373,6 @@
         const token   = localStorage.getItem('token');
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-        // ✂️ Removed the extra single-quotes around the query
         const url = `${API_BASE}/search?label=${encodeURIComponent(toLabel)}&query=${encodeURIComponent(query)}`;
         console.debug('Searching URL:', url);
 
@@ -390,7 +387,6 @@
         if (nodes.length > 0) {
           resultsList.innerHTML = '';
           nodes.forEach(node => {
-            console.debug('Rendering node:', node);
             const li = document.createElement('li');
             li.className = 'list-group-item list-group-item-action';
             li.textContent =
@@ -400,19 +396,14 @@
               node.id;
 
             li.addEventListener('click', async () => {
-              console.debug('Clicked node:', node.id);
               document.getElementById('toId').value = node.id;
               document.getElementById('toNodeSearch').value = li.textContent;
               resultsList.innerHTML = '';
               resultsList.style.display = 'none';
               await validateTargetNode(node.id, toLabel);
             });
-
             resultsList.appendChild(li);
           });
-
-          // finally un-hide the UL
-          console.debug('Showing resultsList');
           resultsList.style.display = 'block';
         }
       } catch (error) {
