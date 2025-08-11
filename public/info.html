@@ -697,8 +697,8 @@
       const properties = {};
       let invalidProp = false;
       document.querySelectorAll('.property-row').forEach((row, index) => {
-        const name = row.querySelector(`[name="prop-name-${index}"]`).value.trim();
-        const value = row.querySelector(`[name="prop-value-${index}"]`).value.trim();
+        let name = row.querySelector(`[name="prop-name-${index}"]`).value.trim();
+        let value = row.querySelector(`[name="prop-value-${index}"]`).value.trim();
         if (value.includes(','))
           value = value.split(',').map(item => item.trim());
         if (name) {

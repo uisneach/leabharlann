@@ -268,7 +268,7 @@
       return res.json();
     }
 
-    function populateList(containerId, items, type, labelKeys) {
+    function populateList(containerId, items, label, labelKeys) {
       const ul = document.getElementById(containerId);
       if (!ul) return;
       ul.innerHTML = '';
@@ -280,7 +280,7 @@
         const id = item.id || '';
         const label = keys.reduce((result, key) => result || properties[key], '') || id;
         a.textContent = label || 'Unknown';
-        a.href = `info.html?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`;
+        a.href = `info.html?type=${encodeURIComponent(label)}&id=${encodeURIComponent(id)}`;
         li.appendChild(a);
         ul.appendChild(li);
       });
@@ -308,7 +308,7 @@
         const nodes = await fetchNodesByLabel(label);
         const col = createColumn(label);
         document.getElementById('columns').appendChild(col);
-        populateList(`${label}-list`, nodes, label, ['name', 'title']);
+        populateList(`${label}-list`, nodes, label, ['display_name', 'name', 'title']);
         updateAuthUI();
         attachRemoveButtonListeners();
       } catch (err) {

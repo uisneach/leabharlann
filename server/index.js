@@ -468,10 +468,10 @@ const displayNameConfig = {
   Edition: {
     primary: ['title', 'name'],
     secondary: 'publication_date'
-  },
-  Author: {
-    primary: ['name'], // Only use name
-    secondary: 'birth_year' // Combine with birth_year
+  }
+  Issue: {
+    primary: ['title', 'name'],
+    secondary: ['volume', 'issue', 'number']
   }
 };
 app.post('/nodes', requireAuth, async (req, res, next) => {
