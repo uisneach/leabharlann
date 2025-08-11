@@ -119,7 +119,7 @@ app.post('/register', async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
     await session.run(
-      'CREATE (u:User {username: $username, passwordHash: $passwordHash, role: $role})',
+      'CREATE (u:User:Entity {username: $username, passwordHash: $passwordHash, role: $role})',
       { username, passwordHash, role: 'user' }
     );
     res.status(201).json({ message: 'User created successfully' });
@@ -460,8 +460,24 @@ app.get('/labels', async (req, res, next) => {
  *       401:
  *         description: Unauthorized
  */
+const displayNameConfig = {
+  Text: {
+    primary: ['title', 'name'], // Try title first, then name
+    secondary: 'publication_date' // Combine with publication_date
+  },
+  Edition: {
+    primary: ['title', 'name'],
+    secondary: 'publication_date'
+  },
+  Author: {
+    primary: ['name'], // Only use name
+    secondary: 'birth_year' // Combine with birth_year
+  }
+};
 app.post('/nodes', requireAuth, async (req, res, next) => {
   const { labels = [], properties = {} } = req.body;
+
+  // Validate input
   if (!labels.length) {
     return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'At least one label is required' } });
   }
@@ -472,22 +488,42 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
     if (!validIdentifier(prop)) {
       return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: `Invalid property: ${prop}` } });
     }
+    if (prop === 'nodeId' || prop === 'createdBy' || prop === 'display_name') {
+      return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: 'Cannot set nodeId, createdBy, or display_name' } });
+    }
   }
+
+  // Generate display_name for applicable labels
+  const updatedProperties = { ...properties };
+  const applicableLabel = labels.find(label => displayNameConfig[label]);
+  if (applicableLabel) {
+    const config = displayNameConfig[applicableLabel];
+    const primaryProp = config.primary.find(prop => properties[prop]);
+    const secondaryProp = config.secondary;
+    if (primaryProp && properties[primaryProp]) {
+      const primaryValue = properties[primaryProp];
+      const secondaryValue = properties[secondaryProp] || '';
+      updatedProperties.display_name = secondaryValue
+        ? `${primaryValue} (${secondaryValue})`
+        : primaryValue;
+    }
+  }
+
   const session = driver.session();
   try {
     const nodeId = uuidv4(); // Generate custom UUID for nodeId
     const allLabels = ['Entity', ...labels]; // Always include Entity label
     const result = await session.run(
       `CREATE (n${allLabels.map(label => `:${label}`).join('')})
-      SET n += $properties
-      SET n.nodeId = $nodeId
-      SET n.createdBy = $username
-      RETURN n, id(n) AS internalId`,
-      { properties, nodeId, username: req.user.username }
+       SET n += $properties
+       SET n.nodeId = $nodeId
+       SET n.createdBy = $username
+       RETURN n, id(n) AS internalId`,
+      { properties: updatedProperties, nodeId, username: req.user.username }
     );
     const node = result.records[0].get('n');
     res.status(201).json({
-      id: node.properties.id,
+      id: node.properties.nodeId,
       labels: node.labels,
       properties: node.properties
     });

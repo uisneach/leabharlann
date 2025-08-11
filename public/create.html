@@ -217,7 +217,7 @@
             const displayName = node.properties.name || node.properties.title || node.id || 'Unknown';
             const item = document.createElement('a');
             item.className = 'list-group-item list-group-item-action';
-            item.href = `info.html?type=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
+            item.href = `info.html?label=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
             item.innerHTML = `<strong>${label}</strong>: ${displayName}`;
             searchResults.appendChild(item);
           });
@@ -329,8 +329,8 @@
 function attachSearchListener(searchInput, resultsList, targetIdInput, targetLabelInput) {
   searchInput.addEventListener('input', async () => {
     const query = searchInput.value.trim();
-    const type = targetLabelInput.value.trim();
-    if (!query || !type) {
+    const label = targetLabelInput.value.trim();
+    if (!query || !label) {
       resultsList.style.display = 'none';
       resultsList.innerHTML = '';
       return;
@@ -341,7 +341,7 @@ function attachSearchListener(searchInput, resultsList, targetIdInput, targetLab
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
       const response = await fetch(
-        `${API_BASE}/nodes/search?type=${encodeURIComponent(type)}&value=${encodeURIComponent(query)}`,
+        `${API_BASE}/nodes/search?label=${encodeURIComponent(label)}&value=${encodeURIComponent(query)}`,
         { headers }
       );
 
@@ -492,7 +492,7 @@ function attachSearchListener(searchInput, resultsList, targetIdInput, targetLab
           }
         }
 
-        window.location.href = `info.html?type=${encodeURIComponent(labels[0].toLowerCase())}&id=${encodeURIComponent(nodeData.id)}`;
+        window.location.href = `info.html?label=${encodeURIComponent(labels[0].toLowerCase())}&id=${encodeURIComponent(nodeData.id)}`;
       } catch (error) {
         errorMessage.style.display = 'block';
         errorMessage.textContent = error.message;
@@ -501,9 +501,9 @@ function attachSearchListener(searchInput, resultsList, targetIdInput, targetLab
 
     window.addEventListener('DOMContentLoaded', () => {
       const urlParams = new URLSearchParams(window.location.search);
-      const type = urlParams.get('type');
-      if (type) {
-        document.getElementById('nodeLabels').value = type;
+      const label = urlParams.get('label');
+      if (label) {
+        document.getElementById('nodeLabels').value = label;
       }
     });
   </script>
