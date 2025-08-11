@@ -287,7 +287,7 @@
       incoming: {
         'EDITION_OF': 'Editions',
         'VERSION_OF': 'Versions',
-        'DERIVED_FROM': 'Manuscripts',
+        'DERIVED_FROM': 'Main Text',
         'TRANSLATION_OF': 'Translations',
         'TRANSLATED': 'Translators',
         'PUBLISHED': 'Publisher',
@@ -699,6 +699,8 @@
       document.querySelectorAll('.property-row').forEach((row, index) => {
         const name = row.querySelector(`[name="prop-name-${index}"]`).value.trim();
         const value = row.querySelector(`[name="prop-value-${index}"]`).value.trim();
+        if (value.includes(','))
+          value = value.split(',').map(item => item.trim());
         if (name) {
           if (/[^a-zA-Z0-9_]/.test(name) || name === 'nodeId' || name === 'createdBy') {
             invalidProp = true;

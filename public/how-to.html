@@ -247,7 +247,7 @@
 
     <h2 class="mt-5">Directory</h2>
     <ul>
-      <li><a href="#neo4j">Built on Neo4j</a></li>
+      <li><a href="#neo4j">A Graph Database</a></li>
       <li><a href="#database-layout">How is This Database Laid Out?</a></li>
       <li><a href="#login">Logging In and Registering</a></li>
       <li><a href="#homepage">Exploring the Homepage</a></li>
@@ -261,8 +261,8 @@
       <li><a href="#troubleshooting">Troubleshooting</a></li>
     </ul>
 
-    <h2 id="neo4j" class="mt-5">1. Built on Neo4j</h2>
-    <p><a href="https://neo4j.com" target="_blank">Neo4j</a> is a graph database designed to store data as <strong>nodes</strong>, and connections between data as <strong>relationships</strong>. Unlike traditional databases that use tables, Neo4j organizes data into a graph structure, making it ideal for representing complex relationships, such as those between authors, texts, editions, publishers, websites, and text versions in this application.</p>
+    <h2 id="neo4j" class="mt-5">1. A Graph Database</h2>
+    <p><a href="https://neo4j.com" target="_blank">Neo4j</a> is a graph database language designed to store data as <strong>nodes</strong>, and connections between data as <strong>relationships</strong>. Unlike traditional databases that use tables, Neo4j organizes data into a graph structure, making it ideal for representing complex relationships, such as those between authors, texts, editions, publishers, websites, and text versions in this application.</p>
     <ul>
       <li><strong>Nodes</strong>: Represent entities like Authors, Texts, or Publishers. Any data which might have multiple data points under it should be a node with properties. Each node has labels (e.g., 'Author', 'Text') and properties (e.g., 'name: "Jane Doe"').</li>
       <li><strong>Relationships</strong>: Connect nodes through relationships like A 'WROTE' B or C 'PUBLISHED' D, allowing us to model how entities are related.</li>
@@ -489,6 +489,31 @@
       <li><strong>Permission Errors</strong>: You can only edit/delete nodes or relationships you created, unless you’re an admin.</li>
       <li><strong>Page Not Loading</strong>: If you see a "Loading…" message or errors, check your internet connection or try refreshing. The app is hosted on Render’s free tier, so occasional delays may occur.</li>
       <li><strong>Contact Support</strong>: If issues persist, contact the administrator (@ogmios on Twitter).</li>
+    </ul>
+    
+    <h2 id="labels" class="mt-5">Labels</h2>
+    <p>A list of all labels currently used:</p>
+    <ul>
+      <li>
+        Author
+        <ul>
+          <li>
+            Used for all people who write, edit, or translate a <a href="#text-label">Text</a>.
+          </li>
+        </ul>
+      </li
+      <li id="text-label">
+        Text
+        <ul>
+          <li>
+            A Text is the pure form of a document or writing, the Platonic ideal of a text, not associated with any edition or translation.
+            <br><br>
+            For example, the Iliad is a Text, written by Homer. Robert Fagles' 1990 book titled "The Iliad" by Homer, published by Penguin Classics, in which he translates the epic into English, is also the Iliad by Homer, but not the pure Text itself. Rather, it is an Edition and Translation of the Text.
+            <br><br>
+            The Text is an umbrella category under which are organized all other nodes related to that Text.
+          </li>
+        </ul>
+      </li>
     </ul>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
