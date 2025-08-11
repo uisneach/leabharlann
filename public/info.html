@@ -396,7 +396,7 @@
     }
 
     function renderPage(data) {
-      const title = data.properties.name || data.properties.title || data.properties.nodeId || data.id;
+      const title = data.properties.display_name || data.properties.name || data.properties.title || data.properties.nodeId || data.id;
       document.getElementById('page-title').textContent = title;
       document.getElementById('createRelationshipBtn').href = `relationship.html?fromType=${encodeURIComponent(type)}&fromId=${encodeURIComponent(data.id)}`;
       const infoTable = document.getElementById('info-table');

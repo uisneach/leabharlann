@@ -278,8 +278,8 @@
         const keys = Array.isArray(labelKeys) ? labelKeys : [labelKeys];
         const properties = item.properties || {};
         const id = item.id || '';
-        const label = keys.reduce((result, key) => result || properties[key], '') || id;
-        a.textContent = label || 'Unknown';
+        const title = keys.reduce((result, key) => result || properties[key], '') || id;
+        a.textContent = title || 'Unknown';
         a.href = `info.html?type=${encodeURIComponent(label)}&id=${encodeURIComponent(id)}`;
         li.appendChild(a);
         ul.appendChild(li);
