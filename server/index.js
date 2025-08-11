@@ -231,7 +231,7 @@ app.post('/login', async (req, res, next) => {
     if (!isValid) {
       return res.status(401).json({ error: { code: 'INVALID_CREDENTIALS', message: 'Invalid username or password' } });
     }
-    const token = jwt.sign({ username, role: user.role }, JWT_SECRET, { expiresIn: '15m' });
+    const token = jwt.sign({ username, role: user.role }, JWT_SECRET, { expiresIn: '90m' });
     const refreshToken = crypto.randomUUID();
     await session.run(
       'MATCH (u:User {username: $username}) SET u.refreshToken = $refreshToken',
