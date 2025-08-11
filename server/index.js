@@ -468,7 +468,7 @@ const displayNameConfig = {
   Edition: {
     primary: ['title', 'name'],
     secondary: 'publication_date'
-  }
+  },
   Issue: {
     primary: ['title', 'name'],
     secondary: ['volume', 'issue', 'number']
