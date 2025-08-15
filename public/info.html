@@ -297,18 +297,20 @@
         'WROTE': 'Author',
         'DISPLAYS': 'Displayed On',
         'PUBLISHED_IN': 'Published',
-        'HOSTS': 'Hosted By'
+        'HOSTS': 'Hosted By',
+        'COMMENTARY_ON': 'Commentary'
       },
       outgoing: {
         'PUBLISHED_BY': 'Publishers',
         'EDITION_OF': 'Source Text',
-        'VERSION_OF': 'Published In',
+        'VERSION_OF': 'A Version Of',
         'DERIVED_FROM': 'Derived From',
         'WROTE': 'Wrote',
         'PUBLISHED_IN': 'Published In',
         'TRANSLATED': 'Translated',
         'DISPLAYS': 'Displays',
-        'HOSTS': 'Hosts'
+        'HOSTS': 'Hosts',
+        'COMMENTARY_ON': 'Commentary On'
       }
     };
 
@@ -644,13 +646,36 @@
     }
 
     function isUrl(s) {
+      if (typeof s !== 'string') return false;
+      s = s.trim();
+      if (s === '') return false;
+
+      // quick reject: unencoded whitespace is almost never a valid absolute URL
+      if (/\s/.test(s)) return false;
+
       try {
-        new URL(s);
-        return true;
-      } catch {
+        const url = new URL(s);
+
+        // allow only known protocols (add more if you want to accept them)
+        const allowed = new Set(['http:', 'https:', 'ftp:', 'mailto:']);
+        if (!allowed.has(url.protocol)) return false;
+
+        // require a hostname for network protocols (http/https/ftp)
+        if (url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'ftp:') {
+          return Boolean(url.hostname); // e.g. "http://example.com"
+        }
+
+        // for mailto we just check there's something after the scheme
+        if (url.protocol === 'mailto:') {
+          return url.pathname && url.pathname.length > 0;
+        }
+
+        return false;
+      } catch (e) {
         return false;
       }
     }
+
 
     function cleanString(input) {
       return (
@@ -700,8 +725,9 @@
       document.querySelectorAll('.property-row').forEach((row, index) => {
         let name = row.querySelector(`[name="prop-name-${index}"]`).value.trim();
         let value = row.querySelector(`[name="prop-value-${index}"]`).value.trim();
-        if (value.includes(','))
-          value = value.split(',').map(item => item.trim());
+        const splitProperties = ['ext_link'];
+        if (splitProperties.includes(name) && value.includes(', '))
+          value = value.split(', ').map(item => item.trim());
         if (name) {
           if (/[^a-zA-Z0-9_]/.test(name) || name === 'nodeId' || name === 'createdBy') {
             invalidProp = true;

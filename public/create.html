@@ -326,55 +326,55 @@
     });
 
     // Handle node search for relationships
-function attachSearchListener(searchInput, resultsList, targetIdInput, targetLabelInput) {
-  searchInput.addEventListener('input', async () => {
-    const query = searchInput.value.trim();
-    const label = targetLabelInput.value.trim();
-    if (!query || !label) {
-      resultsList.style.display = 'none';
-      resultsList.innerHTML = '';
-      return;
-    }
+    function attachSearchListener(searchInput, resultsList, targetIdInput, targetLabelInput) {
+      searchInput.addEventListener('input', async () => {
+        const query = searchInput.value.trim();
+        const label = targetLabelInput.value.trim();
+        if (!query || !label) {
+          resultsList.style.display = 'none';
+          resultsList.innerHTML = '';
+          return;
+        }
 
-    try {
-      const token = localStorage.getItem('token');
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        try {
+          const token = localStorage.getItem('token');
+          const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-      const response = await fetch(
-        `${API_BASE}/nodes/search?label=${encodeURIComponent(label)}&value=${encodeURIComponent(query)}`,
-        { headers }
-      );
+          const response = await fetch(
+            `${API_BASE}/nodes/search?label=${encodeURIComponent(label)}&value=${encodeURIComponent(query)}`,
+            { headers }
+          );
 
-      if (!response.ok) {
-        throw new Error(`Search failed with status: ${response.status}`);
-      }
+          if (!response.ok) {
+            throw new Error(`Search failed with status: ${response.status}`);
+          }
 
-      const results = await response.json();
-      resultsList.innerHTML = ''; // Clear previous results
+          const results = await response.json();
+          resultsList.innerHTML = ''; // Clear previous results
 
-      if (results.length > 0) {
-        results.forEach(node => {
-          const li = document.createElement('li');
-          li.className = 'list-group-item';
-          li.textContent = node.properties?.name || node.properties?.title || node.id;
-          li.addEventListener('click', () => {
-            targetIdInput.value = node.id;
-            searchInput.value = li.textContent;
+          if (results.length > 0) {
+            results.forEach(node => {
+              const li = document.createElement('li');
+              li.className = 'list-group-item';
+              li.textContent = node.properties?.name || node.properties?.title || node.id;
+              li.addEventListener('click', () => {
+                targetIdInput.value = node.id;
+                searchInput.value = li.textContent;
+                resultsList.style.display = 'none';
+                resultsList.innerHTML = '';
+              });
+              resultsList.appendChild(li);
+            });
+            resultsList.style.display = 'block';
+          } else {
             resultsList.style.display = 'none';
-            resultsList.innerHTML = '';
-          });
-          resultsList.appendChild(li);
-        });
-        resultsList.style.display = 'block';
-      } else {
-        resultsList.style.display = 'none';
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      resultsList.style.display = 'none';
+          }
+        } catch (error) {
+          console.error('Search error:', error);
+          resultsList.style.display = 'none';
+        }
+      });
     }
-  });
-}
 
     // Attach search listeners to initial relationship row
     document.querySelectorAll('.relationship-row').forEach(row => {
