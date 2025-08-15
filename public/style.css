@@ -32,6 +32,21 @@ header .navbar-nav .nav-link .navbar-text { color: white; }
   padding: 1rem;
   box-shadow: 0 0 5px rgba(0,0,0,0.1);
 }
+
+#title-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.3rem;
+  margin-bottom: 1rem;
+}
+h3.page-subtitle {
+  font-size: 1rem;
+  color: grey;
+}
+
 h2.section-title {
   border-bottom: 1px solid #ddd;
   padding-bottom: 0.3rem;
@@ -57,9 +72,6 @@ ul.node-list a:hover {
 
 h1.page-title {
   font-size: 2rem;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 0.3rem;
 }
 
 /* Infobox on right */

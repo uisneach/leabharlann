@@ -217,7 +217,7 @@
             const displayName = node.properties.name || node.properties.title || node.id || 'Unknown';
             const item = document.createElement('a');
             item.className = 'list-group-item list-group-item-action';
-            item.href = `info.html?type=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
+            item.href = `info.html?label=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
             item.innerHTML = `<strong>${label}</strong>: ${displayName}`;
             searchResults.appendChild(item);
           });
@@ -280,7 +280,7 @@
         const id = item.id || '';
         const title = keys.reduce((result, key) => result || properties[key], '') || id;
         a.textContent = title || 'Unknown';
-        a.href = `info.html?type=${encodeURIComponent(label)}&id=${encodeURIComponent(id)}`;
+        a.href = `info.html?label=${encodeURIComponent(label)}&id=${encodeURIComponent(id)}`;
         li.appendChild(a);
         ul.appendChild(li);
       });
@@ -294,7 +294,7 @@
         <div class="d-flex justify-content-between align-items-center">
           <h2 class="section-title">${label}s</h2>
           <div>
-            <a href="create.html?type=${encodeURIComponent(label)}" class="btn btn-sm btn-primary create-btn" style="display: none;">+</a>
+            <a href="create.html?label=${encodeURIComponent(label)}" class="btn btn-sm btn-primary create-btn" style="display: none;">+</a>
             <button class="btn btn-sm btn-danger remove-btn" data-label="${label}">Remove</button>
           </div>
         </div>

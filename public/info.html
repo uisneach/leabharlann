@@ -233,7 +233,10 @@
     </script>
   </header>
   <div id="content" class="row">
-    <h1 class="page-title" id="page-title">Loading…</h1>
+    <div class="page-title" id="title-container">
+      <h1 class="page-title" id="page-title">Loading…</h1>
+      <h3 class="page-subtitle" id="label-list">Loading…</h3>
+    </div>
     <div class="col-md-8">
       <div class="mt-3">
         <button id="editPropertiesBtn" class="btn btn-primary me-2" style="display: none;">Edit Properties</button>
@@ -310,7 +313,7 @@
     };
 
     const params = new URLSearchParams(window.location.search);
-    const type = params.get('type');
+    const type = params.get('label');
     const id = params.get('id');
     let nodeId = null;
     let propertyCount = 0;
@@ -368,10 +371,10 @@
       const li = document.createElement('li');
       const a = document.createElement('a');
       const node = rel.node;
-      const label = node.properties.name || node.properties.title || node.properties.nodeId || node.id;
+      const label = node.properties.display_name || node.properties.name || node.properties.title || node.properties.nodeId || node.id;
       const arrow = direction === 'outgoing' ? '→' : '←';
       a.textContent = includeRelType ? `${rel.type} ${arrow} ${label}` : label;
-      a.href = `info.html?type=${typeFromLabel(node.labels)}&id=${encodeURIComponent(node.id)}`;
+      a.href = `info.html?label=${typeFromLabel(node.labels)}&id=${encodeURIComponent(node.id)}`;
       li.appendChild(a);
 
       const deleteBtn = document.createElement('button');
@@ -397,7 +400,9 @@
 
     function renderPage(data) {
       const title = data.properties.display_name || data.properties.name || data.properties.title || data.properties.nodeId || data.id;
+      const labelList = data.labels.map(String).map(s => s.trim()).filter(s => s !== 'Entity');
       document.getElementById('page-title').textContent = title;
+      document.getElementById('label-list').textContent = labelList.join(', ');
       document.getElementById('createRelationshipBtn').href = `relationship.html?fromType=${encodeURIComponent(type)}&fromId=${encodeURIComponent(data.id)}`;
       const infoTable = document.getElementById('info-table');
       const propertiesDisplay = document.getElementById('propertiesDisplay');
@@ -556,10 +561,6 @@
       } else {
         outgoingSection.style.display = 'none';
       }
-    }
-
-    function buildDetailsPanel(data) {
-
     }
 
     async function deleteNode() {
