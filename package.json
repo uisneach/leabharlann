@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@11ty/eleventy": "^3.1.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "cytoscape": "^3.32.0",

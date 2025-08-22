@@ -1,0 +1,509 @@
+---
+layout: layout.njk
+---
+<div id="content" class="row">
+  <div class="page-title" id="title-container">
+    <h1 class="page-title" id="page-title">Loading…</h1>
+    <h3 class="page-subtitle" id="label-list">Loading…</h3>
+  </div>
+  <div class="col-md-8">
+    <div class="mt-3">
+      <button id="editPropertiesBtn" class="btn btn-primary me-2" style="display: none;">Edit Properties</button>
+      <button id="deleteNodeBtn" class="btn btn-danger" style="display: none;">Delete Node</button>
+    </div>
+    <div id="editPropertiesForm" class="mt-3" style="display: none;">
+      <form id="updateForm">
+        <div class="mb-3">
+          <label class="form-label">Properties</label>
+          <table class="table table-bordered" id="propertiesTable">
+            <thead>
+              <tr>
+                <th>Property</th>
+                <th>Value</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="properties"></tbody>
+          </table>
+        </div>
+        <button type="button" class="btn btn-secondary mb-3" id="addProperty">Add Property</button>
+        <div id="updateErrorMessage" class="text-danger mb-3" style="display: none;"></div>
+        <button type="submit" class="btn btn-primary">Update Properties</button>
+        <button type="button" class="btn btn-link" id="cancelEdit">Cancel</button>
+      </form>
+    </div>
+    <div id="propertiesDisplay"></div>
+    <div class="rels-section" id="outgoing-section" style="display:none;">
+      <h3>Outgoing Relationships</h3>
+      <ul class="rels-list" id="outgoing-list"></ul>
+    </div>
+    <div class="rels-section" id="incoming-section" style="display:none;">
+      <h3>Incoming Relationships</h3>
+      <ul class="rels-list" id="incoming-list"></ul>
+    </div>
+    <a href="#" id="createRelationshipBtn" class="btn btn-primary mt-3" style="display: none;">Create Relationship</a>
+  </div>
+  <aside class="col-md-4">
+    <div class="infobox" id="infobox">
+      <h4>Related Pages</h4>
+      <table id="info-table"></table>
+    </div>
+  </aside>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+<script>
+  const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
+
+  // Define special relationships map
+  const specialRels = {
+    incoming: {
+      'EDITION_OF': 'Editions',
+      'VERSION_OF': 'Versions',
+      'DERIVED_FROM': 'Main Text',
+      'TRANSLATION_OF': 'Translations',
+      'TRANSLATED': 'Translators',
+      'PUBLISHED': 'Publisher',
+      'WROTE': 'Author',
+      'DISPLAYS': 'Displayed On',
+      'PUBLISHED_IN': 'Published',
+      'HOSTS': 'Hosted By',
+      'COMMENTARY_ON': 'Commentary'
+    },
+    outgoing: {
+      'PUBLISHED_BY': 'Publishers',
+      'PUBLISHED': 'Published',
+      'EDITION_OF': 'Source Text',
+      'VERSION_OF': 'A Version Of',
+      'DERIVED_FROM': 'Derived From',
+      'WROTE': 'Wrote',
+      'PUBLISHED_IN': 'Published In',
+      'TRANSLATED': 'Translated',
+      'DISPLAYS': 'Displays',
+      'HOSTS': 'Hosts',
+      'COMMENTARY_ON': 'Commentary On'
+    }
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const type = params.get('label');
+  const id = params.get('id');
+  let nodeId = null;
+  let propertyCount = 0;
+
+  async function loadInfo() {
+    if (!type || !id) {
+      document.getElementById('page-title').textContent = 'Invalid parameters';
+      document.getElementById('content').innerHTML = '<p class="text-danger">Missing type or ID</p>';
+      return;
+    }
+    try {
+      const token = localStorage.getItem('token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const nodeRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(id)}`, { headers });
+      if (nodeRes.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        window.location.href = 'index.html';
+        return;
+      }
+      if (!nodeRes.ok) throw new Error(`Failed to load node: ${await nodeRes.text()}`);
+      const data = await nodeRes.json();
+      if (!data) throw new Error('Node not found');
+      nodeId = data.id;
+
+      const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(id)}/relations`, { headers });
+      if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
+      const relData = await relRes.json();
+      data.outgoing = relData.outgoing || [];
+      data.incoming = relData.incoming || [];
+
+      renderPage(data);
+      updateAuthUI();
+    } catch (error) {
+      console.error('Load error:', error);
+      document.getElementById('page-title').textContent = 'Error';
+      document.getElementById('content').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+    }
+  }
+
+  function updateAuthUI() {
+    const isAuthenticated = !!localStorage.getItem('token');
+    document.getElementById('createRelationshipBtn').style.display = isAuthenticated ? 'block' : 'none';
+    document.getElementById('editPropertiesBtn').style.display = isAuthenticated ? 'block' : 'none';
+    document.getElementById('deleteNodeBtn').style.display = isAuthenticated ? 'block' : 'none';
+    document.querySelectorAll('.delete-property-btn').forEach(btn => {
+      btn.style.display = isAuthenticated ? 'inline-block' : 'none';
+    });
+    document.querySelectorAll('.delete-rel-btn').forEach(btn => {
+      btn.style.display = isAuthenticated ? 'inline-block' : 'none';
+    });
+  }
+
+  function createRelListItem(rel, currentNodeId, direction, includeRelType = false) {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    const node = rel.node;
+    const label = node.properties.display_name || node.properties.name || node.properties.title || node.properties.nodeId || node.id;
+    const arrow = direction === 'outgoing' ? '→' : '←';
+    a.textContent = includeRelType ? `${rel.type} ${arrow} ${label}` : label;
+    a.href = `info.html?label=${typeFromLabel(node.labels)}&id=${encodeURIComponent(node.id)}`;
+    li.appendChild(a);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn btn-danger btn-sm delete-rel-btn ms-2';
+    deleteBtn.textContent = 'Delete';
+    if (direction === 'incoming') {
+      deleteBtn.dataset.sourceNodeId = node.id;
+      deleteBtn.dataset.targetNodeId = currentNodeId;
+    } else {
+      deleteBtn.dataset.sourceNodeId = currentNodeId;
+      deleteBtn.dataset.targetNodeId = node.id;
+    }
+    deleteBtn.dataset.relType = rel.type;
+    deleteBtn.addEventListener('click', () => deleteRelationship(
+      deleteBtn.dataset.sourceNodeId,
+      deleteBtn.dataset.targetNodeId,
+      deleteBtn.dataset.relType
+    ));
+    li.appendChild(deleteBtn);
+
+    return li;
+  }
+
+  function renderPage(data) {
+    const title = data.properties.display_name || data.properties.name || data.properties.title || data.properties.nodeId || data.id;
+    const labelList = data.labels.map(String).map(s => s.trim()).filter(s => s !== 'Entity');
+    document.getElementById('page-title').textContent = title;
+    document.getElementById('label-list').textContent = labelList.join(', ');
+    document.getElementById('createRelationshipBtn').href = `relationship.html?fromType=${encodeURIComponent(type)}&fromId=${encodeURIComponent(data.id)}`;
+    const infoTable = document.getElementById('info-table');
+    const propertiesDisplay = document.getElementById('propertiesDisplay');
+    const dataSection = document.createElement('div');
+    const dataTable = document.createElement('table');
+
+    infoTable.innerHTML = '';
+    propertiesDisplay.innerHTML = '';
+    Object.entries(data.properties).forEach(([property, value]) => {
+      // For certain properties we expect to be large or important, move them to the middle section of the page.
+      if (['description', 'analysis'].includes(property)) {
+        const section = document.createElement('div');
+        section.className = 'data-section';
+        section.innerHTML = `<h3 class="section-header">${window.cleanString(property)}</h3><p>${value}</p>`;
+        propertiesDisplay.appendChild(section);
+      } else {
+        // For all other values, which are unimportant by comparison, move to a section at the bottom of the page.
+        const tr = document.createElement('tr');
+        const th = document.createElement('th');
+        th.textContent = window.cleanString(property);
+        const td = document.createElement('td');
+        if (Array.isArray(value)) {
+          value.forEach((item, idx) => {
+            if (window.isUrl(item)) {
+              const a = document.createElement('a');
+              a.href = item;
+              a.textContent = item;
+              a.target = '_blank';
+              td.appendChild(a);
+            } else {
+              td.appendChild(document.createTextNode(item));
+            }
+            if (idx < value.length - 1)
+              td.appendChild(document.createTextNode(', '));
+          });
+        } else {
+          if (typeof value === 'string' && window.isUrl(value)) {
+            const a = document.createElement('a');
+            a.href = value;
+            a.textContent = value;
+            a.target = '_blank';
+            td.appendChild(a);
+          } else {
+            td.textContent = value || '';
+          }
+        }
+        if (property !== 'nodeId' && property !== 'createdBy') {
+          const deleteTd = document.createElement('td');
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'btn btn-danger btn-sm delete-property-btn';
+          deleteBtn.textContent = 'Delete';
+          deleteBtn.dataset.key = property;
+          deleteBtn.addEventListener('click', () => deleteProperty(property));
+          deleteTd.appendChild(deleteBtn);
+          tr.appendChild(deleteTd);
+        }
+        tr.prepend(td);
+        tr.prepend(th);
+        dataTable.appendChild(tr);
+      }
+    });
+
+    if (dataTable.childElementCount > 0) {
+      const header = document.createElement('h3');
+      header.className = 'section-header';
+      header.textContent = 'Details';
+      dataSection.appendChild(header);
+      dataSection.appendChild(dataTable);
+      propertiesDisplay.appendChild(dataSection);
+    }
+
+    // Populate edit form
+    const propertiesTbody = document.getElementById('properties');
+    propertiesTbody.innerHTML = '';
+    propertyCount = 0;
+    Object.entries(data.properties).forEach(([k, v]) => {
+      if (k === 'nodeId' || k === 'createdBy') return;
+      const row = document.createElement('tr');
+      row.className = 'property-row';
+      row.innerHTML = `
+        <td><input type="text" class="form-control" name="prop-name-${propertyCount}" value="${k}" readonly></td>
+        <td><input type="text" class="form-control" name="prop-value-${propertyCount}" value="${v || ''}"></td>
+      `;
+      propertiesTbody.appendChild(row);
+      propertyCount++;
+    });
+
+    // Process relationships
+    const contentDiv = document.querySelector('#content .col-md-8');
+    const outgoingSection = document.getElementById('outgoing-section');
+    const incomingSection = document.getElementById('incoming-section');
+    const infoBox = document.getElementById('infobox');
+
+    // Clear any existing dynamically added sections
+    const existingSections = contentDiv.querySelectorAll('.rels-section:not(#outgoing-section):not(#incoming-section)');
+    existingSections.forEach(section => section.remove());
+
+    // Handle special incoming relationships
+    for (const [relType, header] of Object.entries(specialRels.incoming)) {
+      const rels = data.incoming.filter(r => r.type === relType);
+      if (rels.length > 0) {
+        const section = document.createElement('div');
+        section.className = 'rels-section';
+        section.innerHTML = `<h3>${header}</h3><ul class="rels-list"></ul>`;
+        const list = section.querySelector('.rels-list');
+        rels.forEach(rel => {
+          const li = createRelListItem(rel, data.id, 'incoming', false);
+          list.appendChild(li);
+        });
+        infoBox.insertBefore(section, infoTable);
+      }
+    }
+
+    // Handle special outgoing relationships
+    for (const [relType, header] of Object.entries(specialRels.outgoing)) {
+      const rels = data.outgoing.filter(r => r.type === relType);
+      if (rels.length > 0) {
+        const section = document.createElement('div');
+        section.className = 'rels-section';
+        section.innerHTML = `<h3>${header}</h3><ul class="rels-list"></ul>`;
+        const list = section.querySelector('.rels-list');
+        rels.forEach(rel => {
+          const li = createRelListItem(rel, data.id, 'outgoing', false);
+          list.appendChild(li);
+        });
+        infoBox.insertBefore(section, infoTable);
+      }
+    }
+
+    // Handle general incoming relationships
+    const specialIncomingTypes = Object.keys(specialRels.incoming);
+    const generalIncoming = data.incoming.filter(r => !specialIncomingTypes.includes(r.type));
+    if (generalIncoming.length > 0) {
+      incomingSection.style.display = '';
+      const inList = document.getElementById('incoming-list');
+      inList.innerHTML = '';
+      generalIncoming.forEach(rel => {
+        const li = createRelListItem(rel, data.id, 'incoming', true);
+        inList.appendChild(li);
+      });
+    } else {
+      incomingSection.style.display = 'none';
+    }
+
+    // Handle general outgoing relationships
+    const specialOutgoingTypes = Object.keys(specialRels.outgoing);
+    const generalOutgoing = data.outgoing.filter(r => !specialOutgoingTypes.includes(r.type));
+    if (generalOutgoing.length > 0) {
+      outgoingSection.style.display = '';
+      const outList = document.getElementById('outgoing-list');
+      outList.innerHTML = '';
+      generalOutgoing.forEach(rel => {
+        const li = createRelListItem(rel, data.id, 'outgoing', true);
+        outList.appendChild(li);
+      });
+    } else {
+      outgoingSection.style.display = 'none';
+    }
+  }
+
+  async function deleteNode() {
+    if (!confirm('Are you sure you want to delete this node and all its relationships?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      const response = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete node');
+      window.location.href = 'index.html';
+    } catch (error) {
+      document.getElementById('updateErrorMessage').style.display = 'block';
+      document.getElementById('updateErrorMessage').textContent = error.message;
+    }
+  }
+
+  async function deleteProperty(key) {
+    if (!confirm(`Are you sure you want to delete the property "${key}"?`)) return;
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      const response = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/property/${encodeURIComponent(key)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete property');
+      const data = await response.json();
+      const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
+      const relData = await relRes.json();
+      data.outgoing = relData.outgoing || [];
+      data.incoming = relData.incoming || [];
+      renderPage(data);
+    } catch (error) {
+      document.getElementById('updateErrorMessage').style.display = 'block';
+      document.getElementById('updateErrorMessage').textContent = error.message;
+    }
+  }
+
+  async function deleteRelationship(sourceNodeId, targetNodeId, relType) {
+    if (!confirm('Are you sure you want to delete this relationship?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      const response = await fetch(`${API_BASE}/relation`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ sourceNodeId, targetNodeId, relType })
+      });
+      if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete relationship');
+      const nodeRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!nodeRes.ok) throw new Error(`Failed to load node: ${await nodeRes.text()}`);
+      const data = await nodeRes.json();
+      const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
+      const relData = await relRes.json();
+      data.outgoing = relData.outgoing || [];
+      data.incoming = relData.incoming || [];
+      renderPage(data);
+    } catch (error) {
+      document.getElementById('updateErrorMessage').style.display = 'block';
+      document.getElementById('updateErrorMessage').textContent = error.message;
+    }
+  }
+
+  function typeFromLabel(labels) {
+    if (!labels || !labels.length) return type || 'node';
+    return labels.find(label => label !== 'Entity') || 'node';
+  }
+
+  document.getElementById('editPropertiesBtn').addEventListener('click', () => {
+    document.getElementById('editPropertiesForm').style.display = 'block';
+    document.getElementById('editPropertiesBtn').style.display = 'none';
+    document.getElementById('deleteNodeBtn').style.display = 'none';
+    document.getElementById('propertiesDisplay').style.display = 'none';
+  });
+
+  document.getElementById('cancelEdit').addEventListener('click', () => {
+    document.getElementById('editPropertiesForm').style.display = 'none';
+    document.getElementById('editPropertiesBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
+    document.getElementById('deleteNodeBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
+    document.getElementById('propertiesDisplay').style.display = 'block';
+  });
+
+  document.getElementById('addProperty').addEventListener('click', () => {
+    const tbody = document.getElementById('properties');
+    const row = document.createElement('tr');
+    row.className = 'property-row';
+    row.innerHTML = `
+      <td><input type="text" class="form-control" name="prop-name-${propertyCount}" placeholder="e.g., name, title"></td>
+      <td><input type="text" class="form-control" name="prop-value-${propertyCount}"></td>
+    `;
+    tbody.appendChild(row);
+    propertyCount++;
+  });
+
+  document.getElementById('deleteNodeBtn').addEventListener('click', deleteNode);
+
+  document.getElementById('updateForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const properties = {};
+    let invalidProp = false;
+    document.querySelectorAll('.property-row').forEach((row, index) => {
+      let name = row.querySelector(`[name="prop-name-${index}"]`).value.trim();
+      let value = row.querySelector(`[name="prop-value-${index}"]`).value.trim();
+      const splitProperties = ['ext_link'];
+      if (splitProperties.includes(name) && value.includes(', '))
+        value = value.split(', ').map(item => item.trim());
+      if (name) {
+        if (/[^a-zA-Z0-9_]/.test(name) || name === 'nodeId' || name === 'createdBy') {
+          invalidProp = true;
+          return;
+        }
+        properties[name] = value || null;
+      }
+    });
+    if (invalidProp) {
+      document.getElementById('updateErrorMessage').style.display = 'block';
+      document.getElementById('updateErrorMessage').textContent = 'Property names can only contain letters, numbers, underscores, and cannot be nodeId or createdBy';
+      return;
+    }
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = 'index.html';
+        return;
+      }
+      const response = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ properties })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error.message || 'Failed to update node');
+      document.getElementById('updateErrorMessage').style.display = 'none';
+      document.getElementById('editPropertiesForm').style.display = 'none';
+      document.getElementById('editPropertiesBtn').style.display = 'block';
+      document.getElementById('deleteNodeBtn').style.display = 'block';
+      document.getElementById('propertiesDisplay').style.display = 'block';
+
+      const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
+      const relData = await relRes.json();
+      data.outgoing = relData.outgoing || [];
+      data.incoming = relData.incoming || [];
+      renderPage(data);
+    } catch (error) {
+      document.getElementById('updateErrorMessage').style.display = 'block';
+      document.getElementById('updateErrorMessage').textContent = error.message;
+    }
+  });
+
+  window.addEventListener('DOMContentLoaded', () => {
+    loadInfo();
+    document.addEventListener('authChange', updateAuthUI);
+  });
+</script>

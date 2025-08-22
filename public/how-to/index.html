@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How to Use - An Leabharlann Ghealach</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/x-icon" href="https://uisneac.com/images/Gold-Celtic-Design.png">
+  <!-- Mermaid.js for rendering graph diagrams. -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad:true });</script>
+  <style>
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <nav class="navbar navbar-expand-lg">
+      <a class="navbar-brand" href="index.html">
+        <img src="https://uisneac.com/images/Gold-Celtic-Design.png" alt="Logo" width="32" height="32" class="d-inline-block align-text-top">
+        An Leabharlann Ghealach
+      </a>
+      <form id="search-form" class="d-flex mx-3" style="flex:1;">
+        <input id="search-input" class="form-control me-2" type="search" placeholder="Search the database…" aria-label="Search">
+        <button class="btn btn-light" type="submit">Search</button>
+      </form>
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" id="profileMenu" role="button">Account</a>
+        </li>
+      </ul>
+    </nav>
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="loginModalLabel">Log In</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="loginForm">
+              <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" required>
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" required>
+              </div>
+              <div id="errorMessage" class="text-danger mb-3" style="display: none;"></div>
+              <button type="submit" class="btn btn-primary">Log In</button>
+              <a href="register.html" class="btn btn-link">Register</a>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal fade" id="searchResultsModal" tabindex="-1" aria-labelledby="searchResultsModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="searchResultsModalLabel">Search Results</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="searchResults" class="list-group"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      function updateProfileMenu(username) {
+        const profileMenu = document.getElementById('profileMenu');
+        if (!profileMenu) return;
+        const navItem = profileMenu.parentElement;
+        profileMenu.textContent = username;
+        profileMenu.classList.add('dropdown-toggle');
+        profileMenu.setAttribute('data-bs-toggle', 'dropdown');
+        const existingDropdown = navItem.querySelector('.dropdown-menu');
+        if (existingDropdown) existingDropdown.remove();
+        const dropdown = document.createElement('ul');
+        dropdown.className = 'dropdown-menu dropdown-menu-end';
+        const logoutItem = document.createElement('li');
+        const logoutLink = document.createElement('a');
+        logoutLink.className = 'dropdown-item';
+        logoutLink.href = '#';
+        logoutLink.textContent = 'Log out';
+        logoutLink.addEventListener('click', e => {
+          e.preventDefault();
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          profileMenu.textContent = 'Account';
+          profileMenu.classList.remove('dropdown-toggle');
+          profileMenu.removeAttribute('data-bs-toggle');
+          navItem.querySelector('.dropdown-menu')?.remove();
+          document.dispatchEvent(new Event('authChange'));
+        });
+        logoutItem.appendChild(logoutLink);
+        dropdown.appendChild(logoutItem);
+        navItem.appendChild(dropdown);
+        document.dispatchEvent(new Event('authChange'));
+      }
+
+      async function checkAuthStatus() {
+        const token = localStorage.getItem('token');
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (token) {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            if (Date.now() >= payload.exp * 1000 && refreshToken) {
+              const response = await fetch(`${API_BASE}/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken })
+              });
+              const data = await response.json();
+              if (!response.ok) throw new Error(data.error.message || 'Token refresh failed');
+              localStorage.setItem('token', data.token);
+              updateProfileMenu(payload.username || 'User');
+            } else {
+              updateProfileMenu(payload.username || 'User');
+            }
+          } catch (e) {
+            console.error('Auth check error:', e);
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            document.dispatchEvent(new Event('authChange'));
+          }
+        } else {
+          const profileMenu = document.getElementById('profileMenu');
+          if (profileMenu) {
+            profileMenu.textContent = 'Account';
+            profileMenu.classList.remove('dropdown-toggle');
+            profileMenu.removeAttribute('data-bs-toggle');
+            const navItem = profileMenu.parentElement;
+            navItem.querySelector('.dropdown-menu')?.remove();
+            document.dispatchEvent(new Event('authChange'));
+          }
+        }
+      }
+
+      function attachEventListeners() {
+        const profileMenu = document.getElementById('profileMenu');
+        const loginForm = document.getElementById('loginForm');
+        const searchForm = document.getElementById('search-form');
+
+        if (profileMenu) {
+          profileMenu.addEventListener('click', e => {
+            e.preventDefault();
+            if (!localStorage.getItem('token')) {
+              const modal = new bootstrap.Modal(document.getElementById('loginModal'));
+              modal.show();
+            }
+          });
+        }
+
+        if (loginForm) {
+          loginForm.addEventListener('submit', async e => {
+            e.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('errorMessage');
+            if (!username || !password) {
+              errorMessage.style.display = 'block';
+              errorMessage.textContent = 'Please fill in all fields';
+              return;
+            }
+            try {
+              const response = await fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+              });
+              const data = await response.json();
+              if (!response.ok) throw new Error(data.error.message || 'Login failed');
+              localStorage.setItem('token', data.token);
+              localStorage.setItem('refreshToken', data.refreshToken);
+              errorMessage.style.display = 'none';
+              bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
+              updateProfileMenu(username);
+            } catch (error) {
+              errorMessage.style.display = 'block';
+              errorMessage.textContent = error.message;
+            }
+          });
+        }
+
+        if (searchForm) {
+          searchForm.addEventListener('submit', async e => {
+            e.preventDefault();
+            const q = document.getElementById('search-input').value.trim();
+            if (!q || q.length < 2) {
+              const errorMessage = document.getElementById('errorMessage');
+              errorMessage.style.display = 'block';
+              errorMessage.textContent = 'Please enter at least 2 characters';
+              return;
+            }
+            try {
+              const token = localStorage.getItem('token');
+              const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+              const response = await fetch(`${API_BASE}/search?query=${encodeURIComponent(q)}`, { headers });
+              if (!response.ok) throw new Error((await response.json()).error.message || 'Search failed');
+              const results = await response.json();
+              displaySearchResults(results, q);
+            } catch (error) {
+              const errorMessage = document.getElementById('errorMessage');
+              errorMessage.style.display = 'block';
+              errorMessage.textContent = error.message;
+            }
+          });
+        }
+      }
+
+      function displaySearchResults(results, query) {
+        const searchResults = document.getElementById('searchResults');
+        searchResults.innerHTML = '';
+        if (results.length === 0) {
+          searchResults.innerHTML = '<p class="text-muted">No results found for "' + query + '"</p>';
+        } else {
+          results.forEach(node => {
+            const label = node.labels.find(l => l !== 'Entity') || 'Node';
+            const displayName = node.properties.name || node.properties.title || node.id || 'Unknown';
+            const item = document.createElement('a');
+            item.className = 'list-group-item list-group-item-action';
+            item.href = `info.html?type=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
+            item.innerHTML = `<strong>${label}</strong>: ${displayName}`;
+            searchResults.appendChild(item);
+          });
+        }
+        const modal = new bootstrap.Modal(document.getElementById('searchResultsModal'));
+        modal.show();
+      }
+
+      window.addEventListener('DOMContentLoaded', () => {
+        attachEventListeners();
+        checkAuthStatus();
+      });
+    </script>
+  </header>
+  <div class="container mt-4">
+    <h1 class="mb-4">How to Use An Leabharlann Ghealach</h1>
+    <p>Welcome to <strong>An Leabharlann Ghealach</strong>, a database for Irish and Celtic source texts. This website will allow users to log and cite texts, keep track of secondary analyses, and discover new texts in the network. An Leabharlann will help keep track of all editions and translations of a text and where they can be found online.</p>
+
+    <h2 class="mt-5">Directory</h2>
+    <ul>
+      <li><a href="#neo4j">A Graph Database</a></li>
+      <li><a href="#database-layout">How is This Database Laid Out?</a></li>
+      <li><a href="#login">Logging In and Registering</a></li>
+      <li><a href="#homepage">Exploring the Homepage</a></li>
+      <li><a href="#search">Searching for Nodes</a></li>
+      <li><a href="#node-details">Viewing Node Details</a></li>
+      <li><a href="#create-node">Creating a New Node</a></li>
+      <li><a href="#edit-node">Editing Node Properties</a></li>
+      <li><a href="#delete-node">Deleting a Node</a></li>
+      <li><a href="#relationships">Managing Relationships</a></li>
+      <li><a href="#columns">Customizing Homepage Columns</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+    </ul>
+
+    <h2 id="neo4j" class="mt-5">1. A Graph Database</h2>
+    <p><a href="https://neo4j.com" target="_blank">Neo4j</a> is a graph database language designed to store data as <strong>nodes</strong>, and connections between data as <strong>relationships</strong>. Unlike traditional databases that use tables, Neo4j organizes data into a graph structure, making it ideal for representing complex relationships, such as those between authors, texts, editions, publishers, websites, and text versions in this application.</p>
+    <ul>
+      <li><strong>Nodes</strong>: Represent entities like Authors, Texts, or Publishers. Any data which might have multiple data points under it should be a node with properties. Each node has labels (e.g., 'Author', 'Text') and properties (e.g., 'name: "Jane Doe"').</li>
+      <li><strong>Relationships</strong>: Connect nodes through relationships like A 'WROTE' B or C 'PUBLISHED' D, allowing us to model how entities are related.</li>
+    </ul>
+    <p>A node has properties, and a relationship connects nodes. For example, if we had a node for Homer, it would look like this:</p>
+    <div class="mermaid">
+    graph LR
+      H(("Author<br>name: Homer<br>born: 8th c. BC")):::entity
+      classDef entity fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    </div>
+    <p>And if we had a node for the Iliad, it could look like this:</p>
+    <div class="mermaid">
+    graph LR
+      I(("Text<br>title: The Iliad<br>language: Ancient Greek")):::entity
+      classDef entity fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    </div> 
+    <p>Then we could relate them by saying that Homer WROTE The Iliad:</p>
+    <div class="mermaid">
+    graph LR
+      %% Define two circular nodes with multi-line labels
+      H(("Author<br>name: Homer<br>born: 8th c. BC")):::entity
+      I(("Text<br>title: The Iliad<br>language: Ancient Greek")):::entity
+
+      %% Connect them with a labeled arrow
+      H -->|WROTE| I
+
+      %% Style all .entity nodes
+      classDef entity fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    </div>
+    <p>You can see that each node is given a <strong>label</strong>, here "Author" and "Text". The name of the author and title of the text are properties stored <i>within</i> a node. All nodes have labels telling you what they <i>are</i>, while the properties of a node tell you <i>about</i> the data stored within. So Homer IS AN Author, and the Iliad IS A Text. This feature will become useful later when we discuss searching through the database. Note that a node can have an arbitrary number of labels, e.g. James Clarence Mangan IS AN Author and IS A Translator.</p>
+
+    <h2 id="database-layout" class="mt-5">2. How is This Database Laid Out?</h2>
+    <p>Due to the complexity of relationships in the humanities, no rigid structure could ever capture the unruly relationships of a humanities database without itself becoming unruly. But Neo4j allows users to set relationships that could be unique, as well as relationships that are extremely common. To capture all of these, users can create many different labels to suit their needs.</p>
+    
+    <p>A node consists of a <strong>label</strong> and a list of <strong>properties</strong> and their values.</p>
+    <strong>Node Labels</strong>:
+    <ul>
+      <li><strong>Author</strong>: Represents authors with properties like 'name' (e.g., 'name: "Homer"').</li>
+      <li><strong>Text</strong>: Represents works (e.g., books, poems) with properties like 'title'.</li>
+      <li><strong>Edition</strong>: Represents specific editions of texts with properties like 'title' or 'publication_date'.
+        <ul>
+          <li>For example, the <i>Audacht Morainn</i> is a medieval Irish document. It is a Text. But Fergus Kelly's 1970 translation of the <i>Audacht Morainn</i> is an Edition and a Translation of that Text, not a Text itself. The two are connected with an EDITION_OF relationship.
+            <div class="mermaid">
+            graph LR
+              %% Nodes
+              E(("Edition<br>title: Audacht Morainn<br>publication_date: 1970")):::edition
+              T(("Text<br>title: Audacht Morainn")):::text
+              F(("Author Translator<br>name: Fergus Kelly")):::person
+
+              %% Relationships
+              E -->|EDITION_OF| T
+              F -->|WROTE| E
+              F -->|TRANSLATED| T
+
+              %% Styling
+              classDef edition fill:#f9f9f9,stroke:#333,stroke-width:1px;
+              classDef text    fill:#f9f9f9,stroke:#333,stroke-width:1px;
+              classDef person  fill:#f9f9f9,stroke:#333,stroke-width:1px;
+            </div>
+          </li>
+        </ul>
+      </li>
+      <li><strong>Publisher</strong>: Represents publishing companies, either commercial (Penguin Random House) or academic (Cambridge University Press).</li>
+      <li><strong>Book</strong>: Represents physical books, and no other medium. A Book is always also an Edition, with added properties like 'ISBN'.</li>
+      <li><strong>Webpage</strong>: Represents a single webpage, displaying a Text's contents, a page of a manuscript, or anything else on a single webpage.</li>
+      <li><strong>Website</strong>: Represents a website hosting many webpages or which is otherwise prominent, e.g. the Corpus of Electronic Texts (CELT) which hosts dozens of valuable webpages, or the British Museum (www.britishmuseum.org), which hosts many webpages for individual artifacts.</li>
+      <li>Etc...</li>
+    </ul>
+    <strong>Properties</strong>:
+    <ul>
+      <li>Each node has a unique 'nodeId' and a 'createdBy' property (the username of the creator).</li>
+      <li>Custom properties (e.g., 'name', 'title', 'isbn') can be added as needed, as determined by the user. Must use letters, numbers, or underscores.</li>
+    </ul>
+      </li>
+      <li><strong>Relationships</strong>:
+        <ul>
+          <li>Examples include `WROTE` (Author to Text), `PUBLISHED` (Publisher to Edition), or custom types the user can define.</li>
+          <li>Relationships connect nodes directionally (e.g., Author → Text) and are displayed as related nodes on info pages.</li>
+        </ul>
+      </li>
+      <li><strong>Constraints</strong>: The database enforces a uniqueness or existence constraint in certain vital node properties. For example, every node must have a unique 'nodeId' property to ensure each node has a valid identifier, and all Author nodes must have a 'name' property, etc...</li>
+    </ul>
+    <p>This structure allows a user to create a flexible layout that captures many possible interactions between texts and their authors, publishers, versions, manuscripts, etc., in a way that is navigable and understandable.</p>
+
+    <h2 id="login" class="mt-5">3. Logging In and Registering</h2>
+    <p>Many features, such as creating, editing, or deleting content, require you to be logged in.</p>
+    <ol>
+      <li><strong>Access the Login Form</strong>: Click the "Account" link in the top-right corner of any page.</li>
+      <li><strong>Log In</strong>:
+        <ul>
+          <li>Enter your username and password in the login form.</li>
+          <li>Click "Log In". If successful, the "Account" link will show your username with a dropdown to log out.</li>
+          <li>If you encounter an error (e.g., "Invalid credentials"), double-check your username and password.</li>
+        </ul>
+      </li>
+      <li><strong>Register</strong>:
+        <ul>
+          <li>Click the "Register" link in the login form to go to the registration page.</li>
+          <li>Fill out the form with a unique username and password, then submit.</li>
+          <li>Return to the login form to sign in with your new credentials.</li>
+        </ul>
+      </li>
+      <li><strong>Log Out</strong>: Click your username in the top-right corner and select "Log out" from the dropdown.</li>
+    </ol>
+
+    <h2 id="homepage" class="mt-5">4. Exploring the Homepage</h2>
+    <p>The homepage (<a href="index.html">index.html</a>) displays lists of nodes organized by labels, such as Authors, Texts, and Editions.</p>
+    <ul>
+      <li><strong>Default Columns</strong>: By default, you’ll see three columns for Authors, Texts, and Editions, each listing nodes of that type.</li>
+      <li><strong>Node Links</strong>: Click any node name (e.g., an author’s name) to view its details on the node info page.</li>
+      <li><strong>Create Nodes</strong>: If logged in, a "+" button appears next to each column title, linking to a form to create a new node of that type.</li>
+      <li><strong>Customize Columns</strong>: Add or remove columns to display different node types (see <a href="#columns">Customizing Homepage Columns</a>).</li>
+    </ul>
+
+    <h2 id="search" class="mt-5">5. Searching for Nodes</h2>
+    <p>Use the search bar at the top of any page to find nodes.</p>
+    <ol>
+      <li>Enter a search term (e.g., an author’s name) in the search bar.</li>
+      <li>Press the "Search" button or hit Enter.</li>
+      <li>If a matching Author node is found, you’ll be redirected to its details page. Otherwise, an error message like "No results found" will appear.</li>
+    </ol>
+
+    <h2 id="node-details" class="mt-5">6. Viewing Node Details</h2>
+    <p>The node info page (<a href="info.html">info.html</a>) displays details about a specific node, such as an Author, Text, or Edition.</p>
+    <ul>
+      <li><strong>Node Properties</strong>: View the node’s properties (e.g., name, title) in a table on the right.</li>
+      <li><strong>Relationships</strong>: See lists of outgoing and incoming relationships (e.g., "WROTE → Book Title") below the node title.</li>
+      <li><strong>Actions</strong>: If logged in, you can:
+        <ul>
+          <li>Edit properties (see <a href="#edit-node">Editing Node Properties</a>).</li>
+          <li>Delete the node (see <a href="#delete-node">Deleting a Node</a>).</li>
+          <li>Create or delete relationships (see <a href="#relationships">Managing Relationships</a>).</li>
+        </ul>
+      </li>
+    </ul>
+
+    <h2 id="create-node" class="mt-5">7. Creating a New Node</h2>
+    <p>Authenticated users can create new nodes (e.g., Authors, Texts) from the homepage.</p>
+    <ol>
+      <li>Log in (see <a href="#login">Logging In</a>).</li>
+      <li>Go to the homepage and find the "+" button next to a column title (e.g., "Authors").</li>
+      <li>Click the "+" button to go to the create form for that node type.</li>
+      <li>Fill out the form:
+        <ul>
+          <li><strong>Labels</strong>: Specify one or more labels (e.g., "Author"). All nodes automatically get the "Entity" label.</li>
+          <li><strong>Properties</strong>: Add properties like `name` or `title` (e.g., `name: "Jane Doe"` for an Author).</li>
+        </ul>
+      </li>
+      <li>Submit the form. If successful, you’ll be redirected to the new node’s details page.</li>
+      <li><strong>Error Handling</strong>: If you see an error (e.g., "Invalid label format"), ensure labels and properties use only letters, numbers, or underscores, and avoid reserved names like `nodeId` or `createdBy`.</li>
+    </ol>
+
+    <h2 id="edit-node" class="mt-5">8. Editing Node Properties</h2>
+    <p>Modify a node’s properties from its details page.</p>
+    <ol>
+      <li>Log in and navigate to a node’s details page (e.g., via search or homepage links).</li>
+      <li>Click the "Edit Properties" button below the node title.</li>
+      <li>In the form:
+        <ul>
+          <li>Edit existing property values (e.g., change `name` from "Jane Doe" to "Jane Smith").</li>
+          <li>Add new properties by clicking "Add Property" and entering a name and value.</li>
+          <li>Delete a property by clicking its "Delete" button in the details table.</li>
+        </ul>
+      </li>
+      <li>Click "Update Properties" to save changes or "Cancel" to discard them.</li>
+      <li><strong>Error Handling</strong>: If you see an error (e.g., "Property names can only contain letters, numbers, underscores"), adjust the property name and try again.</li>
+    </ol>
+
+    <h2 id="delete-node" class="mt-5">9. Deleting a Node</h2>
+    <p>Delete a node and all its relationships from its details page.</p>
+    <ol>
+      <li>Log in and navigate to the node’s details page.</li>
+      <li>Click the "Delete Node" button (red, next to "Edit Properties").</li>
+      <li>Confirm the deletion in the pop-up dialog, which warns that all relationships will also be deleted.</li>
+      <li>If successful, you’ll be redirected to the homepage. If an error occurs (e.g., "You can only delete nodes you created"), you’ll see a message below the form.</li>
+      <li><strong>Note</strong>: Only the node’s creator or an admin can delete it.</li>
+    </ol>
+
+    <h2 id="relationships" class="mt-5">10. Managing Relationships</h2>
+    <p>Create or delete relationships between nodes on the node details page.</p>
+    <ul>
+      <li><strong>Create a Relationship</strong>:
+        <ol>
+          <li>Log in and go to a node’s details page.</li>
+          <li>Click the "Create Relationship" button.</li>
+          <li>In the form, select the target node and relationship type (e.g., "WROTE" to a Text node).</li>
+          <li>Submit to create the relationship. The page will refresh to show the new relationship.</li>
+        </ol>
+      </li>
+      <li><strong>Delete a Relationship</strong>:
+        <ol>
+          <li>In the "Outgoing Relationships" or "Incoming Relationships" section, find the relationship (e.g., "WROTE → Book Title").</li>
+          <li>Click the "Delete" button next to it and confirm in the pop-up.</li>
+          <li>The page will refresh, removing the relationship.</li>
+          <li><strong>Note</strong>: Only the relationship’s creator or an admin can delete it.</li>
+        </ol>
+      </li>
+    </ul>
+
+    <h2 id="columns" class="mt-5">11. Customizing Homepage Columns</h2>
+    <p>Adjust the node types displayed on the homepage.</p>
+    <ol>
+      <li><strong>View Default Columns</strong>: The homepage shows Authors, Texts, and Editions by default.</li>
+      <li><strong>Add a Column</strong>:
+        <ul>
+          <li>Log in to see the "Add Column" dropdown above the columns.</li>
+          <li>Select a label (e.g., "Publisher") from the dropdown and click "Add".</li>
+          <li>A new column will appear with nodes of that label.</li>
+        </ul>
+      </li>
+      <li><strong>Remove a Column</strong>:
+        <ul>
+          <li>Click the "Remove" button next to a column’s title (not available for default columns unless additional columns are added).</li>
+          <li>The column will disappear, and its label will return to the "Add Column" dropdown.</li>
+        </ul>
+      </li>
+      <li><strong>Note</strong>: The homepage always shows at least three columns (Authors, Texts, Editions) to maintain a consistent layout.</li>
+    </ol>
+
+    <h2 id="troubleshooting" class="mt-5">12. Troubleshooting</h2>
+    <ul>
+      <li><strong>Login Issues</strong>: Ensure your username and password are correct. If you can’t log in, try registering a new account or resetting your password (if available).</li>
+      <li><strong>Search Returns No Results</strong>: Check your spelling or try broader terms.</li>
+      <li><strong>Permission Errors</strong>: You can only edit/delete nodes or relationships you created, unless you’re an admin.</li>
+      <li><strong>Page Not Loading</strong>: If you see a "Loading…" message or errors, check your internet connection or try refreshing. The app is hosted on Render’s free tier, so occasional delays may occur.</li>
+      <li><strong>Contact Support</strong>: If issues persist, contact the administrator (@ogmios on Twitter).</li>
+    </ul>
+    
+    <h2 id="labels" class="mt-5">Labels</h2>
+    <p>A list of all labels currently used:</p>
+    <ul>
+      <li>
+        Author
+        <ul>
+          <li>
+            Used for all people who write, edit, or translate a <a href="#text-label">Text</a>.
+          </li>
+        </ul>
+      </li>
+      <li id="text-label">
+        Text
+        <ul>
+          <li>
+            A Text is the pure form of a document or writing, the Platonic ideal of a text, not associated with any edition or translation.
+            <br><br>
+            For example, the Iliad is a Text, written by Homer. Robert Fagles' 1990 book titled "The Iliad" by Homer, published by Penguin Classics, in which he translates the epic into English, is also the Iliad by Homer, but not the pure Text itself. Rather, it is an Edition and Translation of the Text.
+            <br><br>
+            The Text is an umbrella category under which are organized all other nodes related to that Text.
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+</body>
+</html>
