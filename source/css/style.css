@@ -91,6 +91,10 @@ h1.page-title {
   table-layout: fixed;
 }
 
+table {
+  width: 100%;
+}
+
  th, td {
   padding-bottom: 0.3rem;
   white-space: normal;
@@ -118,6 +122,9 @@ th {
 }
 .rels-list li {
   margin-bottom: 0.5rem;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
 }
 .rels-list a {
   color: #3366cc;

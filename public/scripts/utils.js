@@ -1,4 +1,4 @@
-function isUrl(s) {
+window.isUrl = function isUrl(s) {
   if (typeof s !== 'string') return false;
   s = s.trim();
   if (s === '') return false;
@@ -27,11 +27,10 @@ function isUrl(s) {
   } catch (e) {
     return false;
   }
-}
-window.isUrl = isUrl;
+};
 
 
-function cleanString(input) {
+window.cleanString = function cleanString(input) {
   return (
     input
       // replace underscore or dash with space
@@ -42,5 +41,50 @@ function cleanString(input) {
       // capitalize first letter of each word
       .replace(/\b\w/g, (ch) => ch.toUpperCase())
   );
-}
-window.cleanString = cleanString;
+};
+
+
+window.createDeleteButton = function(onclickHandler, payload = null, size = '20px', color = 'red') {
+  const button = document.createElement('button');
+  button.className = "btn btn-danger btn-sm delete-property-btn";
+  button.setAttribute('aria-label', 'Delete');
+
+  // Styling — minimal red circle with a horizontal bar
+  button.style.position = 'relative';
+  button.style.width = size;
+  button.style.height = size;
+  button.style.border = `2px solid ${color}`;
+  button.style.borderRadius = '50%';
+  button.style.background = 'transparent';
+  button.style.cursor = 'pointer';
+  button.style.overflow = 'hidden';
+
+  const bar = document.createElement('span');
+  bar.style.position = 'absolute';
+  bar.style.top = '50%';
+  bar.style.left = '15%';
+  bar.style.width = '70%';
+  bar.style.height = '2px';
+  bar.style.background = color;
+  bar.style.transform = 'translateY(-50%)';
+
+  button.appendChild(bar);
+
+
+  if (typeof onclickHandler === 'function') {
+    button.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      try {
+        if (Array.isArray(payload)) {
+          onclickHandler(...payload, { button, event: ev });
+        } else {
+          onclickHandler(payload, { button, event: ev });
+        }
+      } catch (err) {
+        console.error('Error in delete handler:', err);
+      }
+    });
+  }
+
+  return button;
+};
