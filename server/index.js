@@ -460,20 +460,7 @@ app.get('/labels', async (req, res, next) => {
  *       401:
  *         description: Unauthorized
  */
-const displayNameConfig = {
-  Text: {
-    primary: ['title', 'name'], // Try title first, then name
-    secondary: 'publication_date' // Combine with publication_date
-  },
-  Edition: {
-    primary: ['title', 'name'],
-    secondary: 'publication_date'
-  },
-  Issue: {
-    primary: ['title', 'name'],
-    secondary: ['volume', 'issue', 'number']
-  }
-};
+
 app.post('/nodes', requireAuth, async (req, res, next) => {
   const { labels = [], properties = {} } = req.body;
 
@@ -493,22 +480,6 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
     }
   }
 
-  // Generate display_name for applicable labels
-  const updatedProperties = { ...properties };
-  const applicableLabel = labels.find(label => displayNameConfig[label]);
-  if (applicableLabel) {
-    const config = displayNameConfig[applicableLabel];
-    const primaryProp = config.primary.find(prop => properties[prop]);
-    const secondaryProp = config.secondary;
-    if (primaryProp && properties[primaryProp]) {
-      const primaryValue = properties[primaryProp];
-      const secondaryValue = properties[secondaryProp] || '';
-      updatedProperties.display_name = secondaryValue
-        ? `${primaryValue} (${secondaryValue})`
-        : primaryValue;
-    }
-  }
-
   const session = driver.session();
   try {
     const nodeId = uuidv4(); // Generate custom UUID for nodeId
@@ -519,7 +490,7 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
        SET n.nodeId = $nodeId
        SET n.createdBy = $username
        RETURN n, id(n) AS internalId`,
-      { properties: updatedProperties, nodeId, username: req.user.username }
+      { properties: properties, nodeId, username: req.user.username }
     );
     const node = result.records[0].get('n');
     res.status(201).json({
