@@ -1,7 +1,7 @@
 name: Keep Server Awake
 
 on:
-  schedue:
+  schedule:
     - cron: '*/15 * * * *'
 
 jobs:
