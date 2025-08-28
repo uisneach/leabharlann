@@ -1160,7 +1160,10 @@ app.get('/search', async (req, res) => {
   }
 });
 
-
+// Ping endpoint for debugging or waking up the server.
+app.get('/ping', (req, res) => {
+  res.status(200).send('Ping Successful. Server is awake.');
+});
 // Create full‐text index to help search property values (run once at startup)
 async function createFullTextIndex() {
   const session = driver.session();
