@@ -482,7 +482,7 @@
     const labelList = data.labels.map(String).map(s => s.trim()).filter(s => s !== 'Entity');
     document.getElementById('page-title').textContent = title;
     document.getElementById('label-list').textContent = labelList.join(', ');
-    document.getElementById('createRelationshipBtn').href = `/relationship/index.html?fromType=${encodeURIComponent(type)}&fromId=${encodeURIComponent(data.id)}`;
+    document.getElementById('createRelationshipBtn').href = `/leabharlann/relationship/index.html?fromType=${encodeURIComponent(type)}&fromId=${encodeURIComponent(data.id)}`;
     const infoTable = document.getElementById('info-table');
     const propertiesDisplay = document.getElementById('propertiesDisplay');
     const dataSection = document.createElement('div');
@@ -651,12 +651,7 @@
   async function deleteProperty(key) {
     if (!confirm(`Are you sure you want to delete the property "${key}"?`)) return;
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
-      const response = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/property/${encodeURIComponent(key)}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await deleteProperty(nodeId, key);
       if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete property');
       const data = await response.json();
       const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, {
@@ -677,25 +672,12 @@
     console.log(sourceNodeId + "---" + targetNodeId + "---" + relType);
     if (!confirm('Are you sure you want to delete this relationship?')) return;
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
-      const response = await fetch(`${API_BASE}/relation`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ sourceNodeId, targetNodeId, relType })
-      });
+      const response = await deleteRelation(sourceNodeId, targetNodeId, relType);
       if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete relationship');
-      const nodeRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const nodeRes = await getNode(nodeId);
       if (!nodeRes.ok) throw new Error(`Failed to load node: ${await nodeRes.text()}`);
       const data = await nodeRes.json();
-      const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const relRes = await getRelations(nodeId);
       if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
       const relData = await relRes.json();
       data.outgoing = relData.outgoing || [];
@@ -769,14 +751,7 @@
         window.location.href = 'index.html';
         return;
       }
-      const response = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ properties })
-      });
+      const response = await updateNode(nodeId, properties);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error.message || 'Failed to update node');
       document.getElementById('updateErrorMessage').style.display = 'none';
@@ -785,9 +760,7 @@
       document.getElementById('deleteNodeBtn').style.display = 'block';
       document.getElementById('propertiesDisplay').style.display = 'block';
 
-      const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const relRes = await getRelations(nodeId);
       if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
       const relData = await relRes.json();
       data.outgoing = relData.outgoing || [];
