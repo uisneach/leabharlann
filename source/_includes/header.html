@@ -47,7 +47,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div id="searchResults" class="list-group"></div>
+            <div id="headerSearchResults" class="list-group"></div>
           </div>
         </div>
       </div>
@@ -165,7 +165,7 @@
       }
 
       function displaySearchResults(results, query) {
-        const searchResults = document.getElementById('searchResults');
+        const searchResults = document.getElementById('headerSearchResults');
         if (!searchResults) return;
         searchResults.innerHTML = '';
 

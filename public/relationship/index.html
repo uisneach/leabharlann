@@ -60,7 +60,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div id="searchResults" class="list-group"></div>
+            <div id="headerSearchResults" class="list-group"></div>
           </div>
         </div>
       </div>
@@ -178,7 +178,7 @@
       }
 
       function displaySearchResults(results, query) {
-        const searchResults = document.getElementById('searchResults');
+        const searchResults = document.getElementById('headerSearchResults');
         if (!searchResults) return;
         searchResults.innerHTML = '';
 
@@ -330,64 +330,53 @@
   </header>
     <div class="container mt-4">
   <h1>Create Relationship</h1>
-  <h3>Source Node</h3>
-  <p><strong>Type:</strong> <span id="fromType"></span></p>
-  <p><strong>ID:</strong> <span id="fromId"></span></p>
-  <p><strong>Name:</strong> <span id="fromName"></span></p>
-  <form id="createRelationshipForm">
-    <div class="mb-3">
-      <label for="toLabel" class="form-label">Target Node Label</label>
-      <input type="text" class="form-control" id="toLabel" placeholder="e.g., Text" required>
-    </div>
-    <div class="mb-3">
-      <label for="toProperty" class="form-label">Search Property</label>
-      <select class="form-select" id="toProperty" required>
-        <option value="" disabled selected>Select a property</option>
-        <option value="name">Name</option>
-        <option value="title">Title</option>
-        <option value="nodeId">Node ID</option>
-      </select>
-    </div>
-    <div class="mb-3">
-      <label for="toNodeSearch" class="form-label">Search Target Node</label>
-      <div class="input-group">
-        <input type="text" class="form-control" id="toNodeSearch" placeholder="Enter search value" required>
-        <span id="nodeStatus" class="input-group-text"></span>
+  <div class="row">
+    <div class="col-md-6">
+      <h3>Source Node</h3>
+      <div class="card mb-3">
+        <div class="card-body">
+          <p><strong>Type:</strong> <span id="fromType"></span></p>
+          <p><strong>ID:</strong> <span id="fromId"></span></p>
+          <p><strong>Name:</strong> <span id="fromName"></span></p>
+        </div>
       </div>
-      <ul id="searchResults" class="list-group mt-2" style="display: none;"></ul>
-      <input type="hidden" id="toId" required>
     </div>
-    <div class="mb-3">
-      <label for="relType" class="form-label">Relationship Type</label>
-      <input type="text" class="form-control" id="relType" placeholder="e.g., WROTE" required>
+    <div class="col-md-6">
+      <h3>Target Node</h3>
+      <form id="createRelationshipForm">
+        <div class="mb-3">
+          <label for="toNodeSearch" class="form-label">Search Target Node</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="toNodeSearch" placeholder="Enter search value (name, title, or ID)" required>
+            <span id="nodeStatus" class="input-group-text"></span>
+          </div>
+          <ul id="searchResults" class="list-group mt-2" style="display: none; max-height: 200px; overflow-y: auto;"></ul>
+          <input type="hidden" id="toId" required>
+          <input type="hidden" id="toLabel" required>
+        </div>
+        <div class="mb-3">
+          <label for="relType" class="form-label">Relationship Type</label>
+          <input type="text" class="form-control" id="relType" placeholder="e.g., WROTE" required>
+        </div>
+        <div id="errorMessage" class="text-danger mb-3" style="display: none;"></div>
+        <button type="submit" class="btn btn-primary" id="submitButton" disabled>Create Relationship</button>
+        <a href="index.html" class="btn btn-link">Cancel</a>
+      </form>
     </div>
-    <div class="mb-3">
-      <label class="form-label">Relationship Properties (Optional)</label>
-      <table class="table table-bordered" id="relPropertiesTable">
-        <thead>
-          <tr>
-            <th scope="col">Attribute Name</th>
-            <th scope="col">Value</th>
-          </tr>
-        </thead>
-        <tbody id="relProperties">
-          <tr class="property-row">
-            <td><input type="text" class="form-control" name="prop-name-0" placeholder="e.g., role"></td>
-            <td><input type="text" class="form-control" name="prop-value-0"></td>
-          </tr>
-        </tbody>
-      </table>
-      <button type="button" class="btn btn-secondary mb-3" id="addProperty">Add Property</button>
-    </div>
-    <div id="errorMessage" class="text-danger mb-3" style="display: none;"></div>
-    <button type="submit" class="btn btn-primary" id="submitButton" disabled>Create Relationship</button>
-    <a href="index.html" class="btn btn-link">Cancel</a>
-  </form>
+  </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
 <script>
-  let propertyCount = 1;
-  let isNodeValid = false;
+  let propertyCount = 0;
+  let isTargetValid = false;
+
+  function debounce(func, delay) {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), delay);
+    };
+  }
 
   async function loadSourceNode() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -416,125 +405,96 @@
     }
   }
 
-  async function validateTargetNode(nodeId, label) {
-    if (!nodeId || !label) {
-      isNodeValid = false;
-      document.getElementById('nodeStatus').textContent = '';
-      document.getElementById('submitButton').disabled = true;
-      return false;
-    }
-    try {
-      const response = await getNode(nodeId);
-      if (!response.ok) throw new Error('Node not found');
-      const node = await response.json();
-      // Verify the node has the specified label (excluding Entity)
-      const hasLabel = node.labels.includes(label);
-      isNodeValid = hasLabel;
-      document.getElementById('nodeStatus').textContent = hasLabel ? '✔' : '✘';
-      document.getElementById('nodeStatus').className = `input-group-text ${hasLabel ? 'text-success' : 'text-danger'}`;
-      document.getElementById('submitButton').disabled = !hasLabel;
-      return hasLabel;
-    } catch (error) {
-      isNodeValid = false;
-      document.getElementById('nodeStatus').textContent = '✘';
-      document.getElementById('nodeStatus').className = 'input-group-text text-danger';
-      document.getElementById('submitButton').disabled = true;
-      return false;
-    }
-  }
-
-  document.getElementById('toNodeSearch').addEventListener('input', async e => {
-    const query      = e.target.value.trim();
-    const toLabel    = document.getElementById('toLabel').value.trim();
-    const toProperty = document.getElementById('toProperty').value;
+  const performSearch = debounce(async (query) => {
     const resultsList = document.getElementById('searchResults');
+    console.log(searchResults);
+    const nodeStatus = document.getElementById('nodeStatus');
+    const errorMessage = document.getElementById('errorMessage');
 
     resultsList.innerHTML = '';
     resultsList.style.display = 'none';
     document.getElementById('toId').value = '';
-    isNodeValid = false;
-    document.getElementById('nodeStatus').textContent = '';
+    document.getElementById('toLabel').value = '';
+    isTargetValid = false;
+    nodeStatus.textContent = '';
     document.getElementById('submitButton').disabled = true;
+    errorMessage.style.display = 'none';
 
     if (query.length < 2) {
       return;
     }
 
+    nodeStatus.textContent = '🔍';
+
     try {
-      const response = await search(query);//, toLabel);
-      if (!response.ok) {
-        throw new Error(`Search failed with status: ${response.status}`);
+      const searchResponse = await search(query);
+      if (!searchResponse.ok) {
+        throw new Error(`Search failed with status: ${searchResponse.status}`);
       }
 
-      const nodes = await response.json();
+      const nodes = await searchResponse.json();
       console.debug('Search results:', nodes);
 
-      if (nodes.length > 0) {
+      if (nodes.length === 0) {
+        nodeStatus.textContent = '';
+        return;
+      }
+
+      const fullNodesPromises = nodes.map(async (node) => {
+        try {
+          const nodeResponse = await getNode(node.id);
+          if (!nodeResponse.ok) return null;
+          return await nodeResponse.json();
+        } catch {
+          return null;
+        }
+      });
+
+      const fullNodes = await Promise.all(fullNodesPromises);
+      const filteredFullNodes = fullNodes.filter(node => node !== null);
+
+      if (filteredFullNodes.length > 0) {
         resultsList.innerHTML = '';
-        nodes.forEach(node => {
+        filteredFullNodes.forEach(fullNode => {
+          const label = fullNode.labels.find(l => l !== 'Entity') || fullNode.labels[0] || 'Unknown';
+          const displayName = fullNode.properties.display_name || fullNode.properties.name || fullNode.properties.title || fullNode.properties.nodeId || fullNode.id;
+
+          console.log("create list element");
           const li = document.createElement('li');
           li.className = 'list-group-item list-group-item-action';
-          li.textContent = node.properties?.display_name ||
-            node.properties?.[toProperty] ||
-            node.properties?.name ||
-            node.properties?.title ||
-            node.id;
+          li.textContent = `${label}: ${displayName}`;
+          li.dataset.nodeId = fullNode.id;
+          li.dataset.nodeLabel = label;
 
-          li.addEventListener('click', async () => {
-            document.getElementById('toId').value = node.id;
+          li.addEventListener('click', () => {
+            document.getElementById('toId').value = li.dataset.nodeId;
+            document.getElementById('toLabel').value = li.dataset.nodeLabel;
             document.getElementById('toNodeSearch').value = li.textContent;
             resultsList.innerHTML = '';
             resultsList.style.display = 'none';
-            await validateTargetNode(node.id, toLabel);
+            isTargetValid = true;
+            nodeStatus.textContent = '✔';
+            nodeStatus.className = 'input-group-text text-success';
+            document.getElementById('submitButton').disabled = false;
           });
+
           resultsList.appendChild(li);
         });
         resultsList.style.display = 'block';
       }
     } catch (error) {
       console.error('Search error:', error);
-      const errEl = document.getElementById('errorMessage');
-      errEl.style.display = 'block';
-      errEl.textContent = `Search failed: ${error.message}`;
+      errorMessage.style.display = 'block';
+      errorMessage.textContent = `Search failed: ${error.message}`;
+    } finally {
+      if (!isTargetValid) {
+        nodeStatus.textContent = '';
+      }
     }
-  });
+  }, 300);
 
-  document.getElementById('toLabel').addEventListener('input', () => {
-    document.getElementById('toNodeSearch').value = '';
-    document.getElementById('toId').value = '';
-    document.getElementById('searchResults').innerHTML = '';
-    document.getElementById('searchResults').style.display = 'none';
-    isNodeValid = false;
-    document.getElementById('nodeStatus').textContent = '';
-    document.getElementById('submitButton').disabled = true;
-  });
-
-  document.getElementById('toProperty').addEventListener('change', () => {
-    document.getElementById('toNodeSearch').value = '';
-    document.getElementById('toId').value = '';
-    document.getElementById('searchResults').innerHTML = '';
-    document.getElementById('searchResults').style.display = 'none';
-    isNodeValid = false;
-    document.getElementById('nodeStatus').textContent = '';
-    document.getElementById('submitButton').disabled = true;
-  });
-
-  document.getElementById('toId').addEventListener('change', async () => {
-    const toId = document.getElementById('toId').value.trim();
-    const toLabel = document.getElementById('toLabel').value.trim();
-    await validateTargetNode(toId, toLabel);
-  });
-
-  document.getElementById('addProperty').addEventListener('click', () => {
-    const tbody = document.getElementById('relProperties');
-    const row = document.createElement('tr');
-    row.className = 'property-row';
-    row.innerHTML = `
-      <td><input type="text" class="form-control" name="prop-name-${propertyCount}" placeholder="e.g., role"></td>
-      <td><input type="text" class="form-control" name="prop-value-${propertyCount}"></td>
-    `;
-    tbody.appendChild(row);
-    propertyCount++;
+  document.getElementById('toNodeSearch').addEventListener('input', e => {
+    performSearch(e.target.value.trim());
   });
 
   document.getElementById('createRelationshipForm').addEventListener('submit', async e => {
@@ -549,9 +509,12 @@
     const relType = document.getElementById('relType').value.trim();
     const relProps = {};
     let invalidProp = false;
-    document.querySelectorAll('.property-row').forEach((row, index) => {
-      const name = row.querySelector(`[name="prop-name-${index}"]`).value.trim();
-      const value = row.querySelector(`[name="prop-value-${index}"]`).value.trim();
+
+    document.querySelectorAll('.property-row').forEach(row => {
+      const nameInput = row.querySelector('input[name^="prop-name-"]');
+      const valueInput = row.querySelector('input[name^="prop-value-"]');
+      const name = nameInput.value.trim();
+      const value = valueInput.value.trim();
       if (name) {
         if (/[^a-zA-Z0-9_]/.test(name)) {
           invalidProp = true;
@@ -560,6 +523,7 @@
         relProps[name] = value || null;
       }
     });
+
     if (!fromType || !fromId || !toLabel || !toId || !relType) {
       errorMessage.style.display = 'block';
       errorMessage.textContent = 'All fields (source type, source ID, target label, target ID, relationship type) are required';
@@ -575,29 +539,17 @@
       errorMessage.textContent = 'Property names must contain only letters, numbers, or underscores';
       return;
     }
-    if (!isNodeValid) {
+    if (!isTargetValid) {
       errorMessage.style.display = 'block';
       errorMessage.textContent = 'Please select a valid target node';
       return;
     }
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        alert('Invalid token! Please log in.');
-        return;
-      }
-      const response = await fetch(`${API_BASE}/relation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ fromLabel: fromType, fromId, toLabel, toId, relType, relProps })
-      });
+      const response = await createRelation(fromId, toId, relType);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error.message || 'Failed to create relationship');
       errorMessage.style.display = 'none';
-      window.location.href = `info/index.html?type=${encodeURIComponent(fromType)}&id=${encodeURIComponent(fromId)}`;
+      window.location.href = `/leabharlann/info/index.html?type=${encodeURIComponent(fromType)}&id=${encodeURIComponent(fromId)}`;
     } catch (error) {
       errorMessage.style.display = 'block';
       errorMessage.textContent = error.message;
