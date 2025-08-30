@@ -475,8 +475,8 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
     if (!validIdentifier(prop)) {
       return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: `Invalid property: ${prop}` } });
     }
-    if (prop === 'nodeId' || prop === 'createdBy' || prop === 'display_name') {
-      return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: 'Cannot set nodeId, createdBy, or display_name' } });
+    if (prop === 'nodeId' || prop === 'createdBy') {
+      return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: 'Cannot set nodeId or createdBy.' } });
     }
   }
 
