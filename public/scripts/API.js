@@ -57,23 +57,23 @@ const displayNameConfig = {
     secondary: ['volume', 'issue', 'number']
   }
 };
-async function createNode(labels, properties) {
+async function createNode(labels, rawProperties) {
   // Generate display_name for applicable labels
-  const updatedProperties = { ...properties };
+  const properties = { ...rawProperties };
   const applicableLabel = labels.find(label => displayNameConfig[label]);
   if (applicableLabel) {
     const config = displayNameConfig[applicableLabel];
-    const primaryProp = config.primary.find(prop => properties[prop]);
+    const primaryProp = config.primary.find(prop => rawProperties[prop]);
     const secondaryProp = config.secondary;
-    if (primaryProp && properties[primaryProp]) {
-      const primaryValue = properties[primaryProp];
-      const secondaryValue = properties[secondaryProp] || '';
-      updatedProperties.display_name = secondaryValue
+    if (primaryProp && rawProperties[primaryProp]) {
+      const primaryValue = rawProperties[primaryProp];
+      const secondaryValue = rawProperties[secondaryProp] || '';
+      properties.display_name = secondaryValue
         ? `${primaryValue} (${secondaryValue})`
         : primaryValue;
     }
   }
-  return apiRequest('POST', '/nodes', { labels, updatedProperties });
+  return apiRequest('POST', '/nodes', { labels, properties });
 }
 
 // Get a node by ID
