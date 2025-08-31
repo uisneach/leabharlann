@@ -137,11 +137,7 @@
           // if token expired and we have a refreshToken, try refreshing
           if (payload && payload.exp && Date.now() >= payload.exp * 1000) {
             if (!refreshToken) throw new Error('Token expired');
-            const res = await fetch(`${API_BASE}/refresh`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ refreshToken })
-            });
+            const res = await refresh(refreshToken);
             const data = await res.json();
             if (!res.ok) throw new Error(data?.error?.message || 'Token refresh failed');
             // store the new token (and refresh token if returned)
@@ -180,7 +176,7 @@
             const displayName = (node.properties && (node.properties.display_name || node.properties.name || node.properties.title)) || node.id || 'Unknown';
             const item = document.createElement('a');
             item.className = 'list-group-item list-group-item-action';
-            item.href = `info/index.html?type=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
+            item.href = `info/index.html?label=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
             item.innerHTML = `<strong>${label}</strong>: ${escapeHtml(String(displayName))}`;
             searchResults.appendChild(item);
           });
