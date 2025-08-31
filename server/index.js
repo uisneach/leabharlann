@@ -740,8 +740,8 @@ app.delete('/nodes/:id/property/:key', requireAuth, async (req, res, next) => {
  *         description: Source or target node not found
  */
 app.post('/relation', requireAuth, async (req, res, next) => {
-  const { fromId, toId, relType, relProps = {} } = req.body;
-  if (!relType || !fromId || !toId) {
+  const { sourceNodeId, targetNodeId, relType, relProps = {} } = req.body;
+  if (!relType || !sourceNodeId || !targetNodeId) {
     return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'All fields are required.' } });
   }
   if (!validIdentifier(relType)) {
@@ -755,8 +755,8 @@ app.post('/relation', requireAuth, async (req, res, next) => {
   const session = driver.session();
   try {
     const checkResult = await session.run(
-      `MATCH (a:Entity { nodeId: $fromId }) RETURN a.createdBy AS createdBy`,
-      { fromId }
+      `MATCH (a:Entity { nodeId: $sourceNodeId }) RETURN a.createdBy AS createdBy`,
+      { sourceNodeId }
     );
     if (checkResult.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Source node not found' } });
@@ -767,14 +767,14 @@ app.post('/relation', requireAuth, async (req, res, next) => {
     }
     const result = await session.run(
       `
-      MATCH (a:Entity {nodeId: $fromId})
-      MATCH (b:Entity {nodeId: $toId})
+      MATCH (a:Entity {nodeId: $sourceNodeId})
+      MATCH (b:Entity {nodeId: $targetNodeId})
       CREATE (a)-[r:\`${relType}\`]->(b)
       SET r += $relProps
       SET r.createdBy = $username
       RETURN id(r) AS relId, type(r) AS type, properties(r) AS props
       `,
-      { fromId, toId, relProps: { ...relProps, createdBy: req.user.username }, username: req.user.username }
+      { sourceNodeId, targetNodeId, relProps: { ...relProps, createdBy: req.user.username }, username: req.user.username }
     );
     if (result.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Target node not found' } });
