@@ -470,7 +470,7 @@
       const nodeResponse = await createNode(labels, properties);
       const nodeData = await nodeResponse.json();
       if (!nodeResponse.ok) throw new Error(nodeData.error.message || 'Failed to create node');
-      window.location.href = `leabharlann/info/index.html?label=${encodeURIComponent(labels[0].toLowerCase())}&id=${encodeURIComponent(nodeData.id)}`;
+      window.location.href = `/leabharlann/info/index.html?label=${encodeURIComponent(labels[0].toLowerCase())}&id=${encodeURIComponent(nodeData.id)}`;
     } catch (error) {
       errorMessage.style.display = 'block';
       errorMessage.textContent = error.message;
