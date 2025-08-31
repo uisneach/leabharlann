@@ -719,11 +719,7 @@ app.delete('/nodes/:id/property/:key', requireAuth, async (req, res, next) => {
  *           schema:
  *             type: object
  *             properties:
- *               fromLabel:
- *                 type: string
  *               fromId:
- *                 type: string
- *               toLabel:
  *                 type: string
  *               toId:
  *                 type: string
@@ -744,12 +740,12 @@ app.delete('/nodes/:id/property/:key', requireAuth, async (req, res, next) => {
  *         description: Source or target node not found
  */
 app.post('/relation', requireAuth, async (req, res, next) => {
-  const { fromLabel, fromId, toLabel, toId, relType, relProps = {} } = req.body;
-  if (!fromLabel || !toLabel || !relType || !fromId || !toId) {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'All fields are required' } });
+  const { fromId, toId, relType, relProps = {} } = req.body;
+  if (!relType || !fromId || !toId) {
+    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'All fields are required.' } });
   }
-  if (!validIdentifier(fromLabel) || !validIdentifier(toLabel) || !validIdentifier(relType)) {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Invalid label or relationship type format' } });
+  if (!validIdentifier(relType)) {
+    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Invalid relationship type format.' } });
   }
   for (const prop in relProps) {
     if (!validIdentifier(prop)) {
@@ -759,7 +755,7 @@ app.post('/relation', requireAuth, async (req, res, next) => {
   const session = driver.session();
   try {
     const checkResult = await session.run(
-      `MATCH (a:Entity:${fromLabel} { nodeId: $fromId }) RETURN a.createdBy AS createdBy`,
+      `MATCH (a:Entity { nodeId: $fromId }) RETURN a.createdBy AS createdBy`,
       { fromId }
     );
     if (checkResult.records.length === 0) {
@@ -771,8 +767,8 @@ app.post('/relation', requireAuth, async (req, res, next) => {
     }
     const result = await session.run(
       `
-      MATCH (a:Entity:\`${fromLabel}\` {nodeId: $fromId})
-      MATCH (b:Entity:\`${toLabel}\` {nodeId: $toId})
+      MATCH (a:Entity {nodeId: $fromId})
+      MATCH (b:Entity {nodeId: $toId})
       CREATE (a)-[r:\`${relType}\`]->(b)
       SET r += $relProps
       SET r.createdBy = $username
