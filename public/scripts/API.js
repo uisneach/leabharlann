@@ -81,6 +81,11 @@ async function getNode(id) {
   return apiRequest('GET', `/nodes/${encodeURIComponent(id)}`);
 }
 
+// Get all nodes with a given label
+async function getNodesByLabel(label) {
+  return apiRequest('GET', `/nodes/${encodeURIComponent(label)}`);
+}
+
 // Update a node's properties
 async function updateNode(id, properties) {
   return apiRequest('PUT', `/nodes/${encodeURIComponent(id)}`, { properties });

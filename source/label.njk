@@ -1,0 +1,52 @@
+---
+layout: layout.njk
+---
+  <div class="container mt-4">
+    <h1 id="page-title">Loading Nodes...</h1>
+    <ul id="nodes-list" class="list-group"></ul>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+  <script>
+    async function loadNodes(label) {
+      try {
+        const response = await getNodesByLabel(label);
+        if (!response.ok) throw new Error('Failed to load nodes');
+        let nodes = await response.json();
+        // Sort alphabetically by name or title
+        nodes.sort((a, b) => {
+          const nameA = a.properties.name || a.properties.title || a.id;
+          const nameB = b.properties.name || b.properties.title || b.id;
+          return nameA.localeCompare(nameB);
+        });
+        document.getElementById('page-title').textContent = `All ${label} Nodes`;
+        const list = document.getElementById('nodes-list');
+        list.innerHTML = '';
+        nodes.forEach(node => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item';
+          const a = document.createElement('a');
+          a.href = `/leabharlann/info/index.html?label=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
+          a.textContent = node.properties.name || node.properties.title || node.id;
+          li.appendChild(a);
+          list.appendChild(li);
+        });
+      } catch (error) {
+        console.error('Load nodes error:', error);
+        document.getElementById('page-title').textContent = 'Error';
+        document.getElementById('nodes-list').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const label = params.get('label');
+      if (label) {
+        loadNodes(label);
+      } else {
+        document.getElementById('page-title').textContent = 'Invalid parameters';
+        document.getElementById('nodes-list').innerHTML = '<p class="text-danger">Missing label parameter</p>';
+      }
+    });
+  </script>
+</body>
+</html>
