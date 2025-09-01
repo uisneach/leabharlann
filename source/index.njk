@@ -20,18 +20,14 @@ layout: layout.njk
   const defaultLabels = ['Author', 'Text', 'Edition'];
 
   async function fetchLabels() {
-    const token = localStorage.getItem('token');
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-    const res = await fetch(`${API_BASE}/labels`, { headers });
+    const res = await getLabels();
     if (!res.ok) throw new Error('Failed to load labels');
     const data = await res.json();
     return data.labels;
   }
 
   async function fetchNodesByLabel(label) {
-    const token = localStorage.getItem('token');
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-    const res = await fetch(`${API_BASE}/nodes?label=${encodeURIComponent(label)}`, { headers });
+    const res = await getNodesByLabel(label);
     if (!res.ok) throw new Error(`Failed to load ${label} nodes`);
     return res.json();
   }
@@ -48,7 +44,7 @@ layout: layout.njk
       const id = item.id || '';
       const title = keys.reduce((result, key) => result || properties[key], '') || id;
       a.textContent = title || 'Unknown';
-      a.href = `info/index.html?label=${encodeURIComponent(label)}&id=${encodeURIComponent(id)}`;
+      a.href = `/leabharlann/info/index.html?label=${encodeURIComponent(label)}&id=${encodeURIComponent(id)}`;
       li.appendChild(a);
       ul.appendChild(li);
     });
@@ -60,9 +56,9 @@ layout: layout.njk
     col.id = `col-${label}`;
     col.innerHTML = `
       <div class="d-flex justify-content-between align-items-center">
-        <h2 class="section-title">${label}s</h2>
+        <h2 class="section-title">${label}s <a href="/leabharlann/label/index.html?label=${label}" class="ms-2 text-decoration-none" style="font-size:16px;">See All→</a></h2>
         <div>
-          <a href="create/index.html?label=${encodeURIComponent(label)}" class="btn btn-sm btn-primary create-btn" style="display: none;">+</a>
+          <a href="/leabharlann/create/index.html?label=${encodeURIComponent(label)}" class="btn btn-sm btn-primary create-btn" style="display: none;">+</a>
           <button class="btn btn-sm btn-danger remove-btn" data-label="${label}">Remove</button>
         </div>
       </div>

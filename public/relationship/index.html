@@ -403,7 +403,6 @@
 
   const performSearch = debounce(async (query) => {
     const resultsList = document.getElementById('searchResults');
-    console.log(searchResults);
     const nodeStatus = document.getElementById('nodeStatus');
     const errorMessage = document.getElementById('errorMessage');
 
@@ -429,7 +428,6 @@
       }
 
       const nodes = await searchResponse.json();
-      console.debug('Search results:', nodes);
 
       if (nodes.length === 0) {
         nodeStatus.textContent = '';
@@ -455,7 +453,6 @@
           const label = fullNode.labels.find(l => l !== 'Entity') || fullNode.labels[0] || 'Unknown';
           const displayName = fullNode.properties.display_name || fullNode.properties.name || fullNode.properties.title || fullNode.properties.nodeId || fullNode.id;
 
-          console.log("create list element");
           const li = document.createElement('li');
           li.className = 'list-group-item list-group-item-action';
           li.textContent = `${label}: ${displayName}`;

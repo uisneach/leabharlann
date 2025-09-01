@@ -2,7 +2,7 @@
 layout: layout.njk
 ---
   <div class="container mt-4">
-    <h1 id="page-title">Loading Nodes...</h1>
+    <h2 id="page-title">Loading Nodes...</h2>
     <ul id="nodes-list" class="list-group"></ul>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
@@ -18,7 +18,7 @@ layout: layout.njk
           const nameB = b.properties.name || b.properties.title || b.id;
           return nameA.localeCompare(nameB);
         });
-        document.getElementById('page-title').textContent = `All ${label} Nodes`;
+        document.getElementById('page-title').textContent = `All ${label}s`;
         const list = document.getElementById('nodes-list');
         list.innerHTML = '';
         nodes.forEach(node => {
@@ -26,7 +26,7 @@ layout: layout.njk
           li.className = 'list-group-item';
           const a = document.createElement('a');
           a.href = `/leabharlann/info/index.html?label=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
-          a.textContent = node.properties.name || node.properties.title || node.id;
+          a.textContent = node.properties.display_name || node.properties.name || node.properties.title || node.id;
           li.appendChild(a);
           list.appendChild(li);
         });

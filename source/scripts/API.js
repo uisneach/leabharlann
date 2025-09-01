@@ -81,6 +81,11 @@ async function getNode(id) {
   return apiRequest('GET', `/nodes/${encodeURIComponent(id)}`);
 }
 
+// Get list of labels
+async function getLabels() {
+  return apiRequest('GET', '/labels');
+}
+
 // Get all nodes with a given label
 async function getNodesByLabel(label) {
   return apiRequest('GET', `/search/${encodeURIComponent(label)}`);
