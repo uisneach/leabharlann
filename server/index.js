@@ -1194,7 +1194,7 @@ app.get('/search', async (req, res) => {
  *       500:
  *         description: Server error
  */
-app.get('/search/:label', requireAuth, async (req, res, next) => {
+app.get('/search/:label', async (req, res, next) => {
   const { label } = req.params;
   if (!label) {
     return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Label is required' } });
