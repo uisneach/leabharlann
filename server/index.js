@@ -433,74 +433,6 @@ app.get('/labels', async (req, res, next) => {
   }
 });
 
-// --- Get List of Nodes by Label ---
-/**
- * @openapi
- * /nodes/{label}:
- *   get:
- *     summary: Retrieve all nodes in the database with the provided label
- *     parameters:
- *       - name: label
- *         in: path
- *         required: true
- *         schema:
- *           type: string
- *         description: The label of the nodes to retrieve
- *     responses:
- *       200:
- *         description: List of all nodes that have the provided label
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: string
- *                     description: The unique ID of the node
- *                   labels:
- *                     type: array
- *                     items:
- *                       type: string
- *                     description: The labels of the node
- *                   properties:
- *                     type: object
- *                     description: The properties of the node
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Server error
- */
-app.get('/nodes/:label', requireAuth, async (req, res, next) => {
-  const { label } = req.params;
-  if (!label) {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Label is required' } });
-  }
-  if (!validIdentifier(label)) {
-    return res.status(400).json({ error: { code: 'INVALID_LABEL', message: 'Invalid label format' } });
-  }
-  const session = driver.session();
-  try {
-    const result = await session.run(
-      `MATCH (n:Entity:${label}) RETURN n`,
-    );
-    const nodes = result.records.map(record => {
-      const node = record.get('n');
-      return {
-        id: node.properties.nodeId,
-        labels: node.labels,
-        properties: node.properties
-      };
-    });
-    res.json(nodes);
-  } catch (err) {
-    next(err);
-  } finally {
-    await session.close();
-  }
-});
-
 // --- Create Node ---
 /**
  * @openapi
@@ -1218,6 +1150,74 @@ app.get('/search', async (req, res) => {
     res.status(500).json({
       error: { code: 'SERVER_ERROR', message: error.message }
     });
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Get List of Nodes by Label ---
+/**
+ * @openapi
+ * /nodes/{label}:
+ *   get:
+ *     summary: Retrieve all nodes in the database with the provided label
+ *     parameters:
+ *       - name: label
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The label of the nodes to retrieve
+ *     responses:
+ *       200:
+ *         description: List of all nodes that have the provided label
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                     description: The unique ID of the node
+ *                   labels:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     description: The labels of the node
+ *                   properties:
+ *                     type: object
+ *                     description: The properties of the node
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+app.get('/search/:label', requireAuth, async (req, res, next) => {
+  const { label } = req.params;
+  if (!label) {
+    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Label is required' } });
+  }
+  if (!validIdentifier(label)) {
+    return res.status(400).json({ error: { code: 'INVALID_LABEL', message: 'Invalid label format' } });
+  }
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `MATCH (n:Entity:${label}) RETURN n`,
+    );
+    const nodes = result.records.map(record => {
+      const node = record.get('n');
+      return {
+        id: node.properties.nodeId,
+        labels: node.labels,
+        properties: node.properties
+      };
+    });
+    res.json(nodes);
+  } catch (err) {
+    next(err);
   } finally {
     await session.close();
   }
