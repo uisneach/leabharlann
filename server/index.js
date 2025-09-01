@@ -483,7 +483,7 @@ app.get('/nodes/:label', requireAuth, async (req, res, next) => {
   const session = driver.session();
   try {
     const result = await session.run(
-      `MATCH (n:Entity:\`${label}\`) RETURN n`,
+      `MATCH (n:Entity:${label}) RETURN n`,
     );
     const nodes = result.records.map(record => {
       const node = record.get('n');
