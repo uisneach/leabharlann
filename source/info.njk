@@ -164,8 +164,16 @@ layout: layout.njk
     infoTable.innerHTML = '';
     propertiesDisplay.innerHTML = '';
     Object.entries(data.properties).forEach(([property, value]) => {
+      // For the special case of a reference image, display this at the top of the info box.
+      if (['img_link'].includes(property)) {
+        const infobox = document.getElementById('infobox');
+        const img = document.createElement('img');
+        img.src = value;
+        img.style = "width: 100%; max-height: 60vh; object-fit: contain;";
+        infobox.insertBefore(img, infobox.firstChild);
+      }
       // For certain properties we expect to be large or important, move them to the middle section of the page.
-      if (['description', 'analysis'].includes(property)) {
+      else if (['description', 'analysis'].includes(property)) {
         const section = document.createElement('div');
         section.className = 'data-section';
         section.innerHTML = `<h3 class="section-header">${window.cleanString(property)}</h3><p>${value}</p>`;
