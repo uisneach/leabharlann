@@ -1251,7 +1251,21 @@ createFullTextIndex();
 // --- Error Handler ---
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred' } });
+  const statusCode = err.status || 500;
+  const errorDetails = {
+    code: err.code || 'INTERNAL_ERROR',
+    message: err.message || 'An internal error occurred'
+  };
+  // Include stack trace only in development mode
+  if (process.env.NODE_ENV === 'development') {
+    errorDetails.stack = err.stack;
+  }
+  // If it's a Neo4j error, include Neo4j-specific details
+  if (err.name === 'Neo4jError') {
+    errorDetails.neo4jCode = err.code;
+    errorDetails.neo4jMessage = err.message;
+  }
+  res.status(statusCode).json({ error: errorDetails });
 });
 
 // --- Start Server ---
