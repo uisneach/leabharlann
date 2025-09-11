@@ -408,13 +408,12 @@
   };
 
   const params = new URLSearchParams(window.location.search);
-  const type = params.get('label');
   const id = params.get('id');
   let nodeId = null;
   let propertyCount = 0;
 
   async function loadInfo() {
-    if (!type || !id) {
+    if (!id) {
       document.getElementById('page-title').textContent = 'Invalid parameters';
       document.getElementById('content').innerHTML = '<p class="text-danger">Missing type or ID</p>';
       return;
@@ -481,7 +480,7 @@
     const labelList = data.labels.map(String).map(s => s.trim()).filter(s => s !== 'Entity');
     document.getElementById('page-title').textContent = title;
     document.getElementById('label-list').textContent = labelList.join(', ');
-    document.getElementById('createRelationshipBtn').href = `/leabharlann/relationship/index.html?fromType=${encodeURIComponent(type)}&fromId=${encodeURIComponent(data.id)}`;
+    document.getElementById('createRelationshipBtn').href = `/leabharlann/relationship/index.html?fromId=${encodeURIComponent(data.id)}`;
     const infoTable = document.getElementById('info-table');
     const propertiesDisplay = document.getElementById('propertiesDisplay');
     const dataSection = document.createElement('div');

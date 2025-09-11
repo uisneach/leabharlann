@@ -368,7 +368,7 @@
       const id = item.id || '';
       const title = keys.reduce((result, key) => result || properties[key], '') || id;
       a.textContent = title || 'Unknown';
-      a.href = `/leabharlann/info/index.html?label=${encodeURIComponent(label)}&id=${encodeURIComponent(id)}`;
+      a.href = `/leabharlann/info/index.html?id=${encodeURIComponent(id)}`;
       li.appendChild(a);
       ul.appendChild(li);
     });

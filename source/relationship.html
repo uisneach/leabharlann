@@ -53,9 +53,8 @@ layout: layout.njk
 
   async function loadSourceNode() {
     const urlParams = new URLSearchParams(window.location.search);
-    const fromType = urlParams.get('fromType');
     const fromId = urlParams.get('fromId');
-    if (!fromType || !fromId) {
+    if (!fromId) {
       document.querySelector('.container').innerHTML = '<p class="text-danger">Invalid source node parameters</p>';
       return;
     }
@@ -70,7 +69,6 @@ layout: layout.njk
       if (!response.ok) throw new Error(`Error ${response.status}: ${await response.text()}`);
       const data = await response.json();
       if (!data) throw new Error('Node not found');
-      document.getElementById('fromType').textContent = fromType;
       document.getElementById('fromId').textContent = data.id;
       document.getElementById('fromName').textContent = data.properties.name || data.properties.title || data.properties.nodeId || data.id;
     } catch (error) {
