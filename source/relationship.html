@@ -69,6 +69,7 @@ layout: layout.njk
       if (!response.ok) throw new Error(`Error ${response.status}: ${await response.text()}`);
       const data = await response.json();
       if (!data) throw new Error('Node not found');
+      document.getElementById('fromType').textContent = data.labels[0] || 'Entity';
       document.getElementById('fromId').textContent = data.id;
       document.getElementById('fromName').textContent = data.properties.name || data.properties.title || data.properties.nodeId || data.id;
     } catch (error) {
@@ -170,9 +171,7 @@ layout: layout.njk
     const errorMessage = document.getElementById('errorMessage');
     errorMessage.style.display = 'none';
     const urlParams = new URLSearchParams(window.location.search);
-    const fromType = urlParams.get('fromType');
     const fromId = urlParams.get('fromId');
-    const toLabel = document.getElementById('toLabel').value.trim();
     const toId = document.getElementById('toId').value.trim();
     const relType = document.getElementById('relType').value.trim();
     const relProps = {};
@@ -192,14 +191,14 @@ layout: layout.njk
       }
     });
 
-    if (!fromType || !fromId || !toLabel || !toId || !relType) {
+    if (!fromId || !toId || !relType) {
       errorMessage.style.display = 'block';
-      errorMessage.textContent = 'All fields (source type, source ID, target label, target ID, relationship type) are required';
+      errorMessage.textContent = 'All fields (source ID, target ID, relationship type) are required';
       return;
     }
-    if (/[^a-zA-Z0-9_]/.test(relType) || /[^a-zA-Z0-9_]/.test(toLabel)) {
+    if (/[^a-zA-Z0-9_]/.test(relType)) {
       errorMessage.style.display = 'block';
-      errorMessage.textContent = 'Relationship type and target label must contain only letters, numbers, or underscores';
+      errorMessage.textContent = 'Relationship type must contain only letters, numbers, or underscores';
       return;
     }
     if (invalidProp) {
