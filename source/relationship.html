@@ -217,7 +217,7 @@ layout: layout.njk
       const data = await response.json();
       if (!response.ok) throw new Error(data.error.message || 'Failed to create relationship');
       errorMessage.style.display = 'none';
-      window.location.href = `/leabharlann/info/index.html?label=${encodeURIComponent(fromType)}&id=${encodeURIComponent(fromId)}`;
+      window.location.href = `/leabharlann/info/index.html?id=${encodeURIComponent(fromId)}`;
     } catch (error) {
       errorMessage.style.display = 'block';
       errorMessage.textContent = error.message;
