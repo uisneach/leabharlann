@@ -142,7 +142,7 @@ layout: layout.njk
     const label = node.properties.display_name || node.properties.name || node.properties.title || node.properties.nodeId || node.id;
     const arrow = direction === 'outgoing' ? '→' : '←';
     a.textContent = includeRelType ? `${rel.type} ${arrow} ${label}` : label;
-    a.href = `index.html?label=${typeFromLabel(node.labels)}&id=${encodeURIComponent(node.id)}`;
+    a.href = `index.html?id=${encodeURIComponent(node.id)}`;
     li.appendChild(a);
 
     let payload = [((direction === 'incoming') ? node.id : currentNodeId), ((direction === 'incoming') ? currentNodeId : node.id), rel.type];
