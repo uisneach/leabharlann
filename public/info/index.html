@@ -384,6 +384,7 @@
       'TRANSLATION_OF': 'Translations',
       'TRANSLATED': 'Translators',
       'PUBLISHED': 'Publisher',
+      'PUBLISHES': 'Publisher',
       'WROTE': 'Author',
       'DISPLAYS': 'Displayed On',
       'PUBLISHED_IN': 'Published',
@@ -394,6 +395,7 @@
     outgoing: {
       'PUBLISHED_BY': 'Publishers',
       'PUBLISHED': 'Published',
+      'PUBLISHES': 'Publishes',
       'EDITION_OF': 'Source Text',
       'VERSION_OF': 'A Version Of',
       'DERIVED_FROM': 'Derived From',
@@ -466,7 +468,7 @@
     const label = node.properties.display_name || node.properties.name || node.properties.title || node.properties.nodeId || node.id;
     const arrow = direction === 'outgoing' ? '→' : '←';
     a.textContent = includeRelType ? `${rel.type} ${arrow} ${label}` : label;
-    a.href = `index.html?label=${typeFromLabel(node.labels)}&id=${encodeURIComponent(node.id)}`;
+    a.href = `index.html?id=${encodeURIComponent(node.id)}`;
     li.appendChild(a);
 
     let payload = [((direction === 'incoming') ? node.id : currentNodeId), ((direction === 'incoming') ? currentNodeId : node.id), rel.type];
