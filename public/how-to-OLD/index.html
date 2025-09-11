@@ -2,28 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>How to Use - An Leabharlann Ghealach</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>An Leabharlann Ghealach</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/leabharlann/css/style.css">
   <link rel="icon" type="image/x-icon" href="https://uisneac.com/images/Gold-Celtic-Design.png">
-  <!-- Mermaid.js for rendering graph diagrams. -->
-  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-  <script>mermaid.initialize({ startOnLoad:true });</script>
-  <style>
-    .mermaid {
-      display: flex;
-      justify-content: center;
-    }
-  </style>
 </head>
-<body>
-  <header>
+  <body>
+    <script src="/leabharlann/scripts/utils.js"></script>
+    <script src="/leabharlann/scripts/API.js"></script>
+      <header>
     <nav class="navbar navbar-expand-lg">
-      <a class="navbar-brand" href="index.html">
-        <img src="https://uisneac.com/images/Gold-Celtic-Design.png" alt="Logo" width="32" height="32" class="d-inline-block align-text-top">
-        An Leabharlann Ghealach
-      </a>
+      <div id="logo-and-header">
+        <a class="navbar-brand" href="https://uisneac.com" style="margin-right: 0px">
+          <img src="https://uisneac.com/images/Gold-Celtic-Design.png" alt="Logo" width="32" height="32" class="d-inline-block align-text-top">
+        </a>
+        <a class="navbar-brand" href="/leabharlann/index.html">An Leabharlann Ghealach</a>
+      </div>
       <form id="search-form" class="d-flex mx-3" style="flex:1;">
         <input id="search-input" class="form-control me-2" type="search" placeholder="Search the database…" aria-label="Search">
         <button class="btn btn-light" type="submit">Search</button>
@@ -67,12 +62,22 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div id="searchResults" class="list-group"></div>
+            <div id="headerSearchResults" class="list-group"></div>
           </div>
         </div>
       </div>
     </div>
     <script>
+      // Helper: parse JWT payload safely
+      function parseJwt(token) {
+        try {
+          const part = token.split('.')[1];
+          return JSON.parse(atob(part));
+        } catch (e) {
+          return {};
+        }
+      }
+
       function updateProfileMenu(username) {
         const profileMenu = document.getElementById('profileMenu');
         if (!profileMenu) return;
@@ -80,10 +85,25 @@
         profileMenu.textContent = username;
         profileMenu.classList.add('dropdown-toggle');
         profileMenu.setAttribute('data-bs-toggle', 'dropdown');
+
+        // Remove any existing dropdown menu
         const existingDropdown = navItem.querySelector('.dropdown-menu');
         if (existingDropdown) existingDropdown.remove();
+
+        // Build dropdown
         const dropdown = document.createElement('ul');
         dropdown.className = 'dropdown-menu dropdown-menu-end';
+
+        // Profile / account link (optional; you can add more items)
+        const profileItem = document.createElement('li');
+        const profileLink = document.createElement('a');
+        profileLink.className = 'dropdown-item';
+        profileLink.href = 'account.html';
+        profileLink.textContent = 'Account';
+        profileItem.appendChild(profileLink);
+        dropdown.appendChild(profileItem);
+
+        // Logout
         const logoutItem = document.createElement('li');
         const logoutLink = document.createElement('a');
         logoutLink.className = 'dropdown-item';
@@ -93,6 +113,7 @@
           e.preventDefault();
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
+          // revert profile menu to default
           profileMenu.textContent = 'Account';
           profileMenu.classList.remove('dropdown-toggle');
           profileMenu.removeAttribute('data-bs-toggle');
@@ -101,36 +122,19 @@
         });
         logoutItem.appendChild(logoutLink);
         dropdown.appendChild(logoutItem);
+
         navItem.appendChild(dropdown);
+
+        // notify other parts of app
         document.dispatchEvent(new Event('authChange'));
       }
 
       async function checkAuthStatus() {
-        const token = localStorage.getItem('token');
+        let token = localStorage.getItem('token');
         const refreshToken = localStorage.getItem('refreshToken');
-        if (token) {
-          try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            if (Date.now() >= payload.exp * 1000 && refreshToken) {
-              const response = await fetch(`${API_BASE}/refresh`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken })
-              });
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.error.message || 'Token refresh failed');
-              localStorage.setItem('token', data.token);
-              updateProfileMenu(payload.username || 'User');
-            } else {
-              updateProfileMenu(payload.username || 'User');
-            }
-          } catch (e) {
-            console.error('Auth check error:', e);
-            localStorage.removeItem('token');
-            localStorage.removeItem('refreshToken');
-            document.dispatchEvent(new Event('authChange'));
-          }
-        } else {
+
+        if (!token) {
+          // ensure menu shows default
           const profileMenu = document.getElementById('profileMenu');
           if (profileMenu) {
             profileMenu.textContent = 'Account';
@@ -138,9 +142,73 @@
             profileMenu.removeAttribute('data-bs-toggle');
             const navItem = profileMenu.parentElement;
             navItem.querySelector('.dropdown-menu')?.remove();
-            document.dispatchEvent(new Event('authChange'));
           }
+          document.dispatchEvent(new Event('authChange'));
+          return;
         }
+
+        try {
+          let payload = parseJwt(token);
+          // if token expired and we have a refreshToken, try refreshing
+          if (payload && payload.exp && Date.now() >= payload.exp * 1000) {
+            if (!refreshToken) throw new Error('Token expired');
+            const res = await refresh(refreshToken);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.error?.message || 'Token refresh failed');
+            // store the new token (and refresh token if returned)
+            if (data.token) {
+              localStorage.setItem('token', data.token);
+              token = data.token;
+              payload = parseJwt(token);
+            }
+            if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+          }
+
+          // Finally update menu with username (if available)
+          const username = payload.username || payload.sub || 'User';
+          updateProfileMenu(username);
+        } catch (e) {
+          console.error('Auth check error:', e);
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          document.dispatchEvent(new Event('authChange'));
+        }
+      }
+
+      function displaySearchResults(results, query) {
+        const searchResults = document.getElementById('headerSearchResults');
+        if (!searchResults) return;
+        searchResults.innerHTML = '';
+
+        if (!Array.isArray(results) || results.length === 0) {
+          const p = document.createElement('p');
+          p.className = 'text-muted';
+          p.textContent = `No results found for "${query}"`;
+          searchResults.appendChild(p);
+        } else {
+          results.forEach(node => {
+            const label = (node.labels || []).find(l => l !== 'Entity') || 'Node';
+            const displayName = (node.properties && (node.properties.display_name || node.properties.name || node.properties.title)) || node.id || 'Unknown';
+            const item = document.createElement('a');
+            item.className = 'list-group-item list-group-item-action';
+            item.href = `/leabharlann/info/index.html?label=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
+            item.innerHTML = `<strong>${label}</strong>: ${escapeHtml(String(displayName))}`;
+            searchResults.appendChild(item);
+          });
+        }
+
+        const modalEl = document.getElementById('searchResultsModal');
+        if (modalEl && window.bootstrap && typeof window.bootstrap.Modal === 'function') {
+          const modal = new bootstrap.Modal(modalEl);
+          modal.show();
+        }
+      }
+
+      // Escape HTML text to avoid injecting markup.
+      function escapeHtml(str) {
+        return str.replace(/[&<>"']/g, function (m) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+        });
       }
 
       function attachEventListeners() {
@@ -150,10 +218,14 @@
 
         if (profileMenu) {
           profileMenu.addEventListener('click', e => {
-            e.preventDefault();
+            // only open modal if not authenticated (menu isn't a dropdown)
             if (!localStorage.getItem('token')) {
-              const modal = new bootstrap.Modal(document.getElementById('loginModal'));
-              modal.show();
+              e.preventDefault();
+              const loginModalEl = document.getElementById('loginModal');
+              if (loginModalEl && window.bootstrap && typeof window.bootstrap.Modal === 'function') {
+                const modal = new bootstrap.Modal(loginModalEl);
+                modal.show();
+              }
             }
           });
         }
@@ -161,30 +233,52 @@
         if (loginForm) {
           loginForm.addEventListener('submit', async e => {
             e.preventDefault();
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
+            const usernameEl = document.getElementById('username');
+            const passwordEl = document.getElementById('password');
             const errorMessage = document.getElementById('errorMessage');
+
+            const username = usernameEl?.value?.trim() || '';
+            const password = passwordEl?.value || '';
+
             if (!username || !password) {
-              errorMessage.style.display = 'block';
-              errorMessage.textContent = 'Please fill in all fields';
+              if (errorMessage) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = 'Please fill in all fields';
+              }
               return;
             }
+
             try {
-              const response = await fetch(`${API_BASE}/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-              });
+              const response = await login(username, password);
               const data = await response.json();
-              if (!response.ok) throw new Error(data.error.message || 'Login failed');
-              localStorage.setItem('token', data.token);
-              localStorage.setItem('refreshToken', data.refreshToken);
-              errorMessage.style.display = 'none';
-              bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
-              updateProfileMenu(username);
-            } catch (error) {
-              errorMessage.style.display = 'block';
-              errorMessage.textContent = error.message;
+              if (!response.ok) throw new Error(data?.error?.message || 'Login failed');
+
+              if (data.token) localStorage.setItem('token', data.token);
+              if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+
+              if (errorMessage) {
+                errorMessage.style.display = 'none';
+                errorMessage.textContent = '';
+              }
+
+              const loginModalEl = document.getElementById('loginModal');
+              if (loginModalEl && window.bootstrap && bootstrap.Modal.getInstance(loginModalEl)) {
+                bootstrap.Modal.getInstance(loginModalEl).hide();
+              } else if (loginModalEl && window.bootstrap && typeof bootstrap.Modal === 'function') {
+                // fallback: try to hide by creating an instance then hiding
+                const m = new bootstrap.Modal(loginModalEl);
+                m.hide();
+              }
+
+              // Prefer username from returned token payload (if present), else use the submitted username
+              const newToken = data.token || localStorage.getItem('token');
+              const payload = parseJwt(newToken);
+              updateProfileMenu(payload.username || username);
+            } catch (err) {
+              if (errorMessage) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = err.message || 'Login failed';
+              }
             }
           });
         }
@@ -192,62 +286,62 @@
         if (searchForm) {
           searchForm.addEventListener('submit', async e => {
             e.preventDefault();
-            const q = document.getElementById('search-input').value.trim();
+            const q = document.getElementById('search-input')?.value?.trim();
+            const errorMessage = document.getElementById('errorMessage');
+
             if (!q || q.length < 2) {
-              const errorMessage = document.getElementById('errorMessage');
-              errorMessage.style.display = 'block';
-              errorMessage.textContent = 'Please enter at least 2 characters';
+              if (errorMessage) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = 'Please enter at least 2 characters';
+              }
               return;
             }
+
             try {
-              const token = localStorage.getItem('token');
-              const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-              const response = await fetch(`${API_BASE}/search?query=${encodeURIComponent(q)}`, { headers });
-              if (!response.ok) throw new Error((await response.json()).error.message || 'Search failed');
+              const response = await search(q);
+              if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error((data?.error?.message) || 'Search failed');
+              }
               const results = await response.json();
               displaySearchResults(results, q);
-            } catch (error) {
-              const errorMessage = document.getElementById('errorMessage');
-              errorMessage.style.display = 'block';
-              errorMessage.textContent = error.message;
+              if (errorMessage) {
+                errorMessage.style.display = 'none';
+                errorMessage.textContent = '';
+              }
+            } catch (err) {
+              if (errorMessage) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = err.message || 'Search failed';
+              }
             }
           });
         }
       }
 
-      function displaySearchResults(results, query) {
-        const searchResults = document.getElementById('searchResults');
-        searchResults.innerHTML = '';
-        if (results.length === 0) {
-          searchResults.innerHTML = '<p class="text-muted">No results found for "' + query + '"</p>';
-        } else {
-          results.forEach(node => {
-            const label = node.labels.find(l => l !== 'Entity') || 'Node';
-            const displayName = node.properties.name || node.properties.title || node.id || 'Unknown';
-            const item = document.createElement('a');
-            item.className = 'list-group-item list-group-item-action';
-            item.href = `info.html?type=${encodeURIComponent(label)}&id=${encodeURIComponent(node.id)}`;
-            item.innerHTML = `<strong>${label}</strong>: ${displayName}`;
-            searchResults.appendChild(item);
-          });
-        }
-        const modal = new bootstrap.Modal(document.getElementById('searchResultsModal'));
-        modal.show();
-      }
-
+      // Initialize when DOM ready
       window.addEventListener('DOMContentLoaded', () => {
         attachEventListeners();
         checkAuthStatus();
       });
     </script>
   </header>
-  <div class="container mt-4">
+
+      <div class="container mt-4">
+    <!-- Mermaid.js for rendering graph diagrams. -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({ startOnLoad:true });</script>
+    <style>
+      .mermaid {
+        display: flex;
+        justify-content: center;
+      }
+    </style>
     <h1 class="mb-4">How to Use An Leabharlann Ghealach</h1>
     <p>Welcome to <strong>An Leabharlann Ghealach</strong>, a database for Irish and Celtic source texts. This website will allow users to log and cite texts, keep track of secondary analyses, and discover new texts in the network. An Leabharlann will help keep track of all editions and translations of a text and where they can be found online.</p>
 
     <h2 class="mt-5">Directory</h2>
     <ul>
-      <li><a href="#neo4j">A Graph Database</a></li>
       <li><a href="#database-layout">How is This Database Laid Out?</a></li>
       <li><a href="#login">Logging In and Registering</a></li>
       <li><a href="#homepage">Exploring the Homepage</a></li>
@@ -261,39 +355,7 @@
       <li><a href="#troubleshooting">Troubleshooting</a></li>
     </ul>
 
-    <h2 id="neo4j" class="mt-5">1. A Graph Database</h2>
-    <p><a href="https://neo4j.com" target="_blank">Neo4j</a> is a graph database language designed to store data as <strong>nodes</strong>, and connections between data as <strong>relationships</strong>. Unlike traditional databases that use tables, Neo4j organizes data into a graph structure, making it ideal for representing complex relationships, such as those between authors, texts, editions, publishers, websites, and text versions in this application.</p>
-    <ul>
-      <li><strong>Nodes</strong>: Represent entities like Authors, Texts, or Publishers. Any data which might have multiple data points under it should be a node with properties. Each node has labels (e.g., 'Author', 'Text') and properties (e.g., 'name: "Jane Doe"').</li>
-      <li><strong>Relationships</strong>: Connect nodes through relationships like A 'WROTE' B or C 'PUBLISHED' D, allowing us to model how entities are related.</li>
-    </ul>
-    <p>A node has properties, and a relationship connects nodes. For example, if we had a node for Homer, it would look like this:</p>
-    <div class="mermaid">
-    graph LR
-      H(("Author<br>name: Homer<br>born: 8th c. BC")):::entity
-      classDef entity fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    </div>
-    <p>And if we had a node for the Iliad, it could look like this:</p>
-    <div class="mermaid">
-    graph LR
-      I(("Text<br>title: The Iliad<br>language: Ancient Greek")):::entity
-      classDef entity fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    </div> 
-    <p>Then we could relate them by saying that Homer WROTE The Iliad:</p>
-    <div class="mermaid">
-    graph LR
-      %% Define two circular nodes with multi-line labels
-      H(("Author<br>name: Homer<br>born: 8th c. BC")):::entity
-      I(("Text<br>title: The Iliad<br>language: Ancient Greek")):::entity
-
-      %% Connect them with a labeled arrow
-      H -->|WROTE| I
-
-      %% Style all .entity nodes
-      classDef entity fill:#f9f9f9,stroke:#333,stroke-width:1px;
-    </div>
-    <p>You can see that each node is given a <strong>label</strong>, here "Author" and "Text". The name of the author and title of the text are properties stored <i>within</i> a node. All nodes have labels telling you what they <i>are</i>, while the properties of a node tell you <i>about</i> the data stored within. So Homer IS AN Author, and the Iliad IS A Text. This feature will become useful later when we discuss searching through the database. Note that a node can have an arbitrary number of labels, e.g. James Clarence Mangan IS AN Author and IS A Translator.</p>
-
+    
     <h2 id="database-layout" class="mt-5">2. How is This Database Laid Out?</h2>
     <p>Due to the complexity of relationships in the humanities, no rigid structure could ever capture the unruly relationships of a humanities database without itself becoming unruly. But Neo4j allows users to set relationships that could be unique, as well as relationships that are extremely common. To capture all of these, users can create many different labels to suit their needs.</p>
     
@@ -490,32 +552,8 @@
       <li><strong>Page Not Loading</strong>: If you see a "Loading…" message or errors, check your internet connection or try refreshing. The app is hosted on Render’s free tier, so occasional delays may occur.</li>
       <li><strong>Contact Support</strong>: If issues persist, contact the administrator (@ogmios on Twitter).</li>
     </ul>
-    
-    <h2 id="labels" class="mt-5">Labels</h2>
-    <p>A list of all labels currently used:</p>
-    <ul>
-      <li>
-        Author
-        <ul>
-          <li>
-            Used for all people who write, edit, or translate a <a href="#text-label">Text</a>.
-          </li>
-        </ul>
-      </li>
-      <li id="text-label">
-        Text
-        <ul>
-          <li>
-            A Text is the pure form of a document or writing, the Platonic ideal of a text, not associated with any edition or translation.
-            <br><br>
-            For example, the Iliad is a Text, written by Homer. Robert Fagles' 1990 book titled "The Iliad" by Homer, published by Penguin Classics, in which he translates the epic into English, is also the Iliad by Homer, but not the pure Text itself. Rather, it is an Edition and Translation of the Text.
-            <br><br>
-            The Text is an umbrella category under which are organized all other nodes related to that Text.
-          </li>
-        </ul>
-      </li>
-    </ul>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-</body>
+
+  </body>
 </html>

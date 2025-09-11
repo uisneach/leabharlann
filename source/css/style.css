@@ -33,6 +33,14 @@ header .navbar-nav .nav-link .navbar-text { color: white; }
   box-shadow: 0 0 5px rgba(0,0,0,0.1);
 }
 
+#logo-and-header {
+  display: flex;
+}
+
+#search-input {
+  min-width: 180px;
+}
+
 #title-container {
   display: flex;
   flex-direction: row;
