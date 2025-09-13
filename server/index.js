@@ -324,9 +324,22 @@ app.post('/refresh', async (req, res, next) => {
  */
 app.get('/nodes', async (req, res, next) => {
   const { label, limit = 10, offset = 0 } = req.query;
-  if (label && !validIdentifier(label)) {
+  
+  // Validate label: must be a valid Cypher identifier (alphanumeric + underscore, no spaces/special chars)
+  if (label && !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(label)) {
     return res.status(400).json({ error: { code: 'INVALID_LABEL', message: 'Invalid label format' } });
   }
+
+  // Validate and parse limit/offset: must be non-negative integers, limit capped at 100
+  const parsedLimit = parseInt(limit, 10);
+  const parsedOffset = parseInt(offset, 10);
+  if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
+    return res.status(400).json({ error: { code: 'INVALID_LIMIT', message: 'Limit must be an integer between 1 and 100' } });
+  }
+  if (isNaN(parsedOffset) || parsedOffset < 0) {
+    return res.status(400).json({ error: { code: 'INVALID_OFFSET', message: 'Offset must be a non-negative integer' } });
+  }
+
   const session = driver.session();
   try {
     const cypher = label
@@ -426,6 +439,82 @@ app.get('/labels', async (req, res, next) => {
       .map(record => record.get('label'))
       .filter(label => label !== 'User');
     res.status(200).json({ labels });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Update Node Labels ---
+/**
+ * @openapi
+ * /nodes/{id}/labels:
+ *   put:
+ *     summary: Update labels on a node
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               labels:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Labels updated successfully
+ *       400:
+ *         description: Invalid input
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Node not found
+ */
+app.put('/nodes/:id/labels', requireAuth, requireAdmin, async (req, res, next) => {
+  const { id } = req.params;
+  const { labels } = req.body;
+
+  if (!Array.isArray(labels)) {
+    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'labels must be an array of strings' } });
+  }
+
+  const invalidLabels = labels.filter(label => typeof label !== 'string' || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(label));
+  if (invalidLabels.length > 0) {
+    return res.status(400).json({ error: { code: 'INVALID_LABELS', message: 'All labels must be valid Cypher identifiers' } });
+  }
+
+  // Assume auth middleware runs first; add admin check here if user role is available in req.user
+  // e.g., if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+
+  const session = driver.session();
+  try {
+    const cypher = `
+      MATCH (n:Entity {nodeId: $nodeId})
+      WITH n, [l IN labels(n) WHERE l <> 'Entity'] AS oldLabels
+      FOREACH(old IN oldLabels | REMOVE n:old)
+      WITH n
+      FOREACH(newLabel IN $labels | SET n:newLabel)
+      RETURN n
+    `;
+    const result = await session.run(cypher, { nodeId: id, labels });
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+    }
+    const node = result.records[0].get('n');
+    res.json({
+      id: node.properties.nodeId,
+      labels: node.labels,
+      properties: node.properties
+    });
   } catch (err) {
     next(err);
   } finally {

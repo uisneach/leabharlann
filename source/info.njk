@@ -9,6 +9,7 @@ layout: layout.njk
   <div class="col-md-8">
     <div class="mt-3">
       <button id="editPropertiesBtn" class="btn btn-primary me-2" style="display: none;">Edit Properties</button>
+      <button id="editLabelsBtn" class="btn btn-primary me-2" style="display: none;">Edit Labels</button>
       <button id="deleteNodeBtn" class="btn btn-danger" style="display: none;">Delete Node</button>
     </div>
     <div id="editPropertiesForm" class="mt-3" style="display: none;">
@@ -29,6 +30,18 @@ layout: layout.njk
         <div id="updateErrorMessage" class="text-danger mb-3" style="display: none;"></div>
         <button type="submit" class="btn btn-primary">Update Properties</button>
         <button type="button" class="btn btn-link" id="cancelEdit">Cancel</button>
+      </form>
+    </div>
+    <div id="editLabelsForm" class="mt-3" style="display: none;">
+      <form id="updateLabelsForm">
+        <div class="mb-3">
+          <label class="form-label">Labels</label>
+          <ul id="labelsList" class="list-unstyled"></ul>
+        </div>
+        <button type="button" class="btn btn-secondary" id="addLabel">Add Label</button>
+        <div id="updateLabelsErrorMessage" class="text-danger mb-3" style="display: none;"></div>
+        <button type="submit" class="btn btn-primary">Update Labels</button>
+        <button type="button" class="btn btn-link" id="cancelEditLabels">Cancel</button>
       </form>
     </div>
     <div id="propertiesDisplay"></div>
@@ -91,6 +104,7 @@ layout: layout.njk
   const id = params.get('id');
   let nodeId = null;
   let propertyCount = 0;
+  let labelCount = 0;
 
   async function loadInfo() {
     if (!id) {
@@ -130,6 +144,7 @@ layout: layout.njk
     const isAuthenticated = !!localStorage.getItem('token');
     document.getElementById('createRelationshipBtn').style.display = isAuthenticated ? 'block' : 'none';
     document.getElementById('editPropertiesBtn').style.display = isAuthenticated ? 'block' : 'none';
+    document.getElementById('editLabelsBtn').style.display = isAuthenticated ? 'block' : 'none';
     document.getElementById('deleteNodeBtn').style.display = isAuthenticated ? 'block' : 'none';
     document.querySelectorAll('.delete-property-btn').forEach(btn => {
       btn.style.display = isAuthenticated ? 'inline-block' : 'none';
@@ -238,7 +253,7 @@ layout: layout.njk
       propertiesDisplay.appendChild(dataSection);
     }
 
-    // Populate edit form
+    // Populate edit properties form
     const propertiesTbody = document.getElementById('properties');
     propertiesTbody.innerHTML = '';
     propertyCount = 0;
@@ -252,6 +267,22 @@ layout: layout.njk
       `;
       propertiesTbody.appendChild(row);
       propertyCount++;
+    });
+
+    // Populate edit labels form
+    const labelsList = document.getElementById('labelsList');
+    labelsList.innerHTML = '';
+    labelCount = 0;
+    const editableLabels = data.labels.filter(l => l !== 'Entity').map(String).map(s => s.trim());
+    editableLabels.forEach(label => {
+      const li = document.createElement('li');
+      li.className = 'label-item';
+      li.innerHTML = `
+        <input type="text" class="form-control d-inline-block w-auto me-2" name="label-${labelCount}" value="${label}" style="width: 200px;">
+        <button type="button" class="btn btn-sm btn-danger remove-label">Remove</button>
+      `;
+      labelsList.appendChild(li);
+      labelCount++;
     });
 
     // Process relationships
@@ -379,6 +410,18 @@ layout: layout.njk
     }
   }
 
+  async function updateNodeLabels(nodeId, labels) {
+    const token = localStorage.getItem('token');
+    return fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/labels`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ labels })
+    });
+  }
+
   function typeFromLabel(labels) {
     if (!labels || !labels.length) return type || 'node';
     return labels.find(label => label !== 'Entity') || 'node';
@@ -386,14 +429,35 @@ layout: layout.njk
 
   document.getElementById('editPropertiesBtn').addEventListener('click', () => {
     document.getElementById('editPropertiesForm').style.display = 'block';
+    document.getElementById('editLabelsForm').style.display = 'none';
     document.getElementById('editPropertiesBtn').style.display = 'none';
+    document.getElementById('editLabelsBtn').style.display = 'none';
     document.getElementById('deleteNodeBtn').style.display = 'none';
     document.getElementById('propertiesDisplay').style.display = 'none';
   });
 
+  document.getElementById('editLabelsBtn').addEventListener('click', () => {
+    document.getElementById('editLabelsForm').style.display = 'block';
+    document.getElementById('editPropertiesForm').style.display = 'none';
+    document.getElementById('editPropertiesBtn').style.display = 'none';
+    document.getElementById('editLabelsBtn').style.display = 'none';
+    document.getElementById('deleteNodeBtn').style.display = 'none';
+  });
+
   document.getElementById('cancelEdit').addEventListener('click', () => {
     document.getElementById('editPropertiesForm').style.display = 'none';
+    document.getElementById('editLabelsForm').style.display = 'none';
     document.getElementById('editPropertiesBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
+    document.getElementById('editLabelsBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
+    document.getElementById('deleteNodeBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
+    document.getElementById('propertiesDisplay').style.display = 'block';
+  });
+
+  document.getElementById('cancelEditLabels').addEventListener('click', () => {
+    document.getElementById('editLabelsForm').style.display = 'none';
+    document.getElementById('editPropertiesForm').style.display = 'none';
+    document.getElementById('editPropertiesBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
+    document.getElementById('editLabelsBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
     document.getElementById('deleteNodeBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
     document.getElementById('propertiesDisplay').style.display = 'block';
   });
@@ -408,6 +472,25 @@ layout: layout.njk
     `;
     tbody.appendChild(row);
     propertyCount++;
+  });
+
+  document.getElementById('addLabel').addEventListener('click', () => {
+    const labelsList = document.getElementById('labelsList');
+    const li = document.createElement('li');
+    li.className = 'label-item';
+    li.innerHTML = `
+      <input type="text" class="form-control d-inline-block w-auto me-2" name="label-${labelCount}" placeholder="New label" style="width: 200px;">
+      <button type="button" class="btn btn-sm btn-danger remove-label">Remove</button>
+    `;
+    labelsList.appendChild(li);
+    labelCount++;
+  });
+
+  // Event delegation for remove label buttons
+  document.addEventListener('click', (e) => {
+    if (e.target.matches('.remove-label')) {
+      e.target.closest('.label-item').remove();
+    }
   });
 
   document.getElementById('deleteNodeBtn').addEventListener('click', deleteNode);
@@ -459,6 +542,52 @@ layout: layout.njk
     } catch (error) {
       document.getElementById('updateErrorMessage').style.display = 'block';
       document.getElementById('updateErrorMessage').textContent = error.message;
+    }
+  });
+
+  document.getElementById('updateLabelsForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const labels = [];
+    let invalidLabel = false;
+    document.querySelectorAll('#labelsList .label-item input').forEach(input => {
+      const label = input.value.trim();
+      if (label) {
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(label)) {
+          invalidLabel = true;
+          return;
+        }
+        labels.push(label);
+      }
+    });
+    if (invalidLabel) {
+      document.getElementById('updateLabelsErrorMessage').style.display = 'block';
+      document.getElementById('updateLabelsErrorMessage').textContent = 'Labels must be valid identifiers (start with letter/underscore, followed by letters/numbers/underscores)';
+      return;
+    }
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = 'index.html';
+        return;
+      }
+      const response = await updateNodeLabels(nodeId, labels);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error.message || 'Failed to update labels');
+      document.getElementById('updateLabelsErrorMessage').style.display = 'none';
+      document.getElementById('editLabelsForm').style.display = 'none';
+      document.getElementById('editPropertiesBtn').style.display = 'block';
+      document.getElementById('editLabelsBtn').style.display = 'block';
+      document.getElementById('deleteNodeBtn').style.display = 'block';
+
+      const relRes = await getRelations(nodeId);
+      if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
+      const relData = await relRes.json();
+      data.outgoing = relData.outgoing || [];
+      data.incoming = relData.incoming || [];
+      renderPage(data);
+    } catch (error) {
+      document.getElementById('updateLabelsErrorMessage').style.display = 'block';
+      document.getElementById('updateLabelsErrorMessage').textContent = error.message;
     }
   });
 
