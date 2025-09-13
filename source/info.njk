@@ -197,7 +197,7 @@ layout: layout.njk
         infobox.insertBefore(img, infobox.firstChild);
       }
       // For certain properties we expect to be large or important, move them to the middle section of the page.
-      else if (['description', 'contents', 'analysis'].includes(property)) {
+      else if (['description', 'contents', 'analysis', 'works'].includes(property)) {
         const section = document.createElement('div');
         section.className = 'data-section';
         section.innerHTML = `<h3 class="section-header">${window.cleanString(property)}</h3><p>${value}</p>`;

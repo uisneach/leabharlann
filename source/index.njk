@@ -127,7 +127,6 @@ layout: layout.njk
       for (const label of defaultLabels) {
         await renderColumn(label);
       }
-      //await Promise.all(defaultLabels.map(label => renderColumn(label)));
       await updateAddLabelDropdown();
       document.getElementById('add-label-btn').addEventListener('click', async () => {
         const select = document.getElementById('add-label-select');

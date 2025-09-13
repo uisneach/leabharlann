@@ -40,16 +40,50 @@
             <form id="loginForm">
               <div class="mb-3">
                 <label for="username" class="form-label">Username</label>
-                <input type="text" class="form-control" id="username" required>
+                <input type="text" class="form-control" id="login-username" required>
               </div>
               <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
-                <input type="password" class="form-control" id="password" required>
+                <label for="login-password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="login-password" required>
               </div>
               <div id="errorMessage" class="text-danger mb-3" style="display: none;"></div>
               <button type="submit" class="btn btn-primary">Log In</button>
-              <a href="register.html" class="btn btn-link">Register</a>
+              <a id="register-button" class="btn btn-link">Register</a>
             </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal fade" id="registerModal" tabindex="-1" aria-labelledby="registerModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="registerModalLabel">Register</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="alert-container"></div>
+            <form id="register-form">
+              <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="register-username" placeholder="Enter a unique username" required>
+                <small class="form-text text-muted">3-20 characters, alphanumeric and underscores only.</small>
+                <div class="invalid-feedback"></div>
+              </div>
+              <div class="mb-3">
+                <label for="register-password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="register-password" placeholder="Create a password" required>
+                <small class="form-text text-muted">At least 8 characters.</small>
+                <div class="invalid-feedback"></div>
+              </div>
+              <div class="mb-3">
+                <label for="confirm-password" class="form-label">Confirm Password</label>
+                <input type="password" class="form-control" id="confirm-password" placeholder="Re-enter your password" required>
+                <div class="invalid-feedback"></div>
+              </div>
+              <button type="submit" id="submit-btn" class="btn btn-primary w-100">Register</button>
+            </form>
+            <p class="text-center mt-3">Already have an account? <a href="login.html">Log In</a></p>
           </div>
         </div>
       </div>
@@ -215,6 +249,7 @@
         const profileMenu = document.getElementById('profileMenu');
         const loginForm = document.getElementById('loginForm');
         const searchForm = document.getElementById('search-form');
+        const registerButton = document.getElementById('register-button');
 
         if (profileMenu) {
           profileMenu.addEventListener('click', e => {
@@ -233,8 +268,8 @@
         if (loginForm) {
           loginForm.addEventListener('submit', async e => {
             e.preventDefault();
-            const usernameEl = document.getElementById('username');
-            const passwordEl = document.getElementById('password');
+            const usernameEl = document.getElementById('login-username');
+            const passwordEl = document.getElementById('login-password');
             const errorMessage = document.getElementById('errorMessage');
 
             const username = usernameEl?.value?.trim() || '';
@@ -317,7 +352,132 @@
             }
           });
         }
+
+        if (registerButton) {
+          registerButton.addEventListener('click', async e => {
+            // Close the login modal
+            const loginModalEl = document.getElementById('loginModal');
+            if (loginModalEl && window.bootstrap && bootstrap.Modal.getInstance(loginModalEl)) {
+              bootstrap.Modal.getInstance(loginModalEl).hide();
+            } else if (loginModalEl && window.bootstrap && typeof bootstrap.Modal === 'function') {
+              // fallback: try to hide by creating an instance then hiding
+              const m = new bootstrap.Modal(loginModalEl);
+              m.hide();
+            }
+
+            // Open the registration modal
+            const registerModalEl = document.getElementById('registerModal');
+            if (registerModalEl && window.bootstrap && typeof window.bootstrap.Modal === 'function') {
+              const modal = new bootstrap.Modal(registerModalEl);
+              modal.show();
+            }
+          });
+        }
       }
+
+      document.getElementById('register-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const alertContainer = document.getElementById('alert-container');
+        alertContainer.innerHTML = ''; // Clear previous alerts
+
+        // Get form data
+        const username = document.getElementById('register-username').value.trim();
+        const password = document.getElementById('register-password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+
+        // Client-side validation
+        let valid = true;
+        const usernameFeedback = document.querySelector('#register-username ~ .invalid-feedback');
+        const passwordFeedback = document.querySelector('#register-password ~ .invalid-feedback');
+        const confirmFeedback = document.querySelector('#confirm-password ~ .invalid-feedback');
+
+        // Reset previous errors
+        /*[username, password, confirmPassword].forEach(field => {
+          if (field) field.classList.remove('is-invalid');
+        });
+        [usernameFeedback, passwordFeedback, confirmFeedback].forEach(fb => {
+          if (fb) fb.textContent = '';
+        });*/
+
+        if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+          document.getElementById('register-username').classList.add('is-invalid');
+          if (usernameFeedback) usernameFeedback.textContent = 'Username must be 8-20 characters, alphanumeric and underscores only.';
+          valid = false;
+          console.log("invalid on regex");
+        }
+        console.log(password.length);
+        if (password.length < 8) {
+          document.getElementById('register-password').classList.add('is-invalid');
+          if (passwordFeedback) passwordFeedback.textContent = 'Password must be at least 8 characters long.';
+          valid = false;
+        }
+        console.log(password);
+        console.log(confirmPassword);
+        if (password !== confirmPassword) {
+          document.getElementById('confirm-password').classList.add('is-invalid');
+          if (confirmFeedback) confirmFeedback.textContent = 'Passwords do not match.';
+          valid = false;
+        }
+
+        console.log("valid: " + valid);
+        if (!valid) return;
+
+        const submitBtn = document.getElementById('submit-btn');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Registering...';
+
+        try {
+          const response = await register(username, password);
+          const data = await response.json();
+
+          if (response.ok) {
+            // Show success alert
+            alertContainer.innerHTML = '<div class="alert alert-success" role="alert">Account created successfully. Logging in...</div>';
+
+            // Auto-login
+            const loginResponse = await login(username, password);
+            const loginData = await loginResponse.json();
+
+            if (!loginResponse.ok || !loginData.token) {
+              throw new Error(loginData.error?.message || 'Login failed after registration');
+            }
+
+            // Store tokens
+            localStorage.setItem('token', loginData.token);
+            if (loginData.refreshToken) localStorage.setItem('refreshToken', loginData.refreshToken);
+
+            // Close modal and redirect
+            const registerModal = bootstrap.Modal.getInstance(document.getElementById('registerModal'));
+            if (registerModal) registerModal.hide();
+
+            setTimeout(() => {
+              window.location.href = '.';///leabharlann/index.html'; // Adjust redirect as needed
+            }, 1500);
+          } else {
+            throw new Error(data.error?.message || 'Registration failed');
+          }
+        } catch (error) {
+          alertContainer.innerHTML = `<div class="alert alert-danger" role="alert">${error.message}</div>`;
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+      });
+
+      // Clear errors on input
+      ['username', 'password', 'confirm-password'].forEach(id => {
+        const field = document.getElementById(id);
+        if (field) {
+          field.addEventListener('input', () => {
+            field.classList.remove('is-invalid');
+            const feedback = field.nextElementSibling?.nextElementSibling; // Adjust selector if needed
+            if (feedback && feedback.classList.contains('invalid-feedback')) {
+              feedback.textContent = '';
+            }
+          });
+        }
+      });
 
       // Initialize when DOM ready
       window.addEventListener('DOMContentLoaded', () => {
@@ -326,7 +486,6 @@
       });
     </script>
   </header>
-
     
 <div class="container text-center my-5">
   <h1>404</h1>

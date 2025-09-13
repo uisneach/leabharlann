@@ -28,8 +28,8 @@ async function apiRequest(method, path, body = null) {
 }
 
 // Register a new user
-async function register(username, email, password) {
-  return apiRequest('POST', '/register', { username, email, password });
+async function register(username, password) {
+  return apiRequest('POST', '/register', { username, password });
 }
 
 // Login user
