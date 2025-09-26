@@ -391,35 +391,22 @@
         const passwordFeedback = document.querySelector('#register-password ~ .invalid-feedback');
         const confirmFeedback = document.querySelector('#confirm-password ~ .invalid-feedback');
 
-        // Reset previous errors
-        /*[username, password, confirmPassword].forEach(field => {
-          if (field) field.classList.remove('is-invalid');
-        });
-        [usernameFeedback, passwordFeedback, confirmFeedback].forEach(fb => {
-          if (fb) fb.textContent = '';
-        });*/
-
         if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
           document.getElementById('register-username').classList.add('is-invalid');
           if (usernameFeedback) usernameFeedback.textContent = 'Username must be 8-20 characters, alphanumeric and underscores only.';
           valid = false;
-          console.log("invalid on regex");
         }
-        console.log(password.length);
         if (password.length < 8) {
           document.getElementById('register-password').classList.add('is-invalid');
           if (passwordFeedback) passwordFeedback.textContent = 'Password must be at least 8 characters long.';
           valid = false;
         }
-        console.log(password);
-        console.log(confirmPassword);
         if (password !== confirmPassword) {
           document.getElementById('confirm-password').classList.add('is-invalid');
           if (confirmFeedback) confirmFeedback.textContent = 'Passwords do not match.';
           valid = false;
         }
 
-        console.log("valid: " + valid);
         if (!valid) return;
 
         const submitBtn = document.getElementById('submit-btn');
@@ -693,19 +680,19 @@
         const th = document.createElement('th');
         th.textContent = window.cleanString(property);
         const td = document.createElement('td');
+        console.log(value);
         if (Array.isArray(value)) {
-          value.forEach((item, idx) => {
+          value.forEach((item) => {
             if (window.isUrl(item)) {
               const a = document.createElement('a');
               a.href = item;
               a.textContent = item;
               a.target = '_blank';
               td.appendChild(a);
+              td.appendChild(document.createElement('br'));
             } else {
               td.appendChild(document.createTextNode(item));
             }
-            if (idx < value.length - 1)
-              td.appendChild(document.createTextNode(', '));
           });
         } else {
           if (typeof value === 'string' && window.isUrl(value)) {

@@ -3,6 +3,66 @@
 
 const API_BASE = 'https://an-leabharlann-ghealach.onrender.com';
 
+// Helper function to show timed alert
+function showTimedAlert(message, type = 'danger') {
+  const alertDiv = document.createElement('div');
+  alertDiv.className = `alert alert-${type} alert-dismissible position-fixed top-0 start-50 translate-middle-x mt-3`;
+  alertDiv.role = 'alert';
+
+  // Close button
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'btn-close';
+  closeBtn.setAttribute('data-bs-dismiss', 'alert');
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.style.fontSize = '0.8rem';
+  closeBtn.style.opacity = '0.5';
+  closeBtn.style.position = 'absolute';
+  closeBtn.style.top = '0.25rem';
+  closeBtn.style.right = '0.25rem';
+  closeBtn.style.padding = '0';
+  alertDiv.appendChild(closeBtn);
+
+  // Message
+  const messageDiv = document.createElement('div');
+  messageDiv.textContent = message;
+  alertDiv.appendChild(messageDiv);
+
+  // Timer bar (progress bar)
+  const progress = document.createElement('div');
+  progress.className = 'progress mt-2';
+  progress.style.height = '4px';
+  const progressBar = document.createElement('div');
+  progressBar.className = 'progress-bar bg-secondary';
+  progressBar.style.width = '100%';
+  progressBar.style.transition = 'width 5s linear';
+  progress.appendChild(progressBar);
+  alertDiv.appendChild(progress);
+
+  document.body.appendChild(alertDiv);
+
+  // Trigger Bootstrap alert (if Bootstrap is loaded)
+  if (typeof bootstrap !== 'undefined' && bootstrap.Alert) {
+    new bootstrap.Alert(alertDiv);
+  }
+
+  // Start countdown animation
+  setTimeout(() => {
+    progressBar.style.width = '0%';
+  }, 10);
+
+  // Auto-remove after 8 seconds
+  const timeoutId = setTimeout(() => {
+    alertDiv.remove();
+  }, 5000);
+
+  // Clear timeout if manually closed
+  alertDiv.addEventListener('closed.bs.alert', () => {
+    clearTimeout(timeoutId);
+  });
+}
+
+
 // Helper function to get auth headers
 function getAuthHeaders() {
   const token = localStorage.getItem('token');
@@ -15,16 +75,22 @@ async function apiRequest(method, path, body = null) {
     'Content-Type': 'application/json',
     ...getAuthHeaders(),
   };
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : null,
-  });
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error?.message || 'API request failed');
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : null,
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const message = errorData.error?.message || 'API request failed';
+      throw new Error(message);
+    }
+    return response;
+  } catch (error) {
+    showTimedAlert(error.message || 'An unexpected error occurred');
+    throw error;
   }
-  return response;
 }
 
 // Register a new user

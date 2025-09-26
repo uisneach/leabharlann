@@ -208,19 +208,19 @@ layout: layout.njk
         const th = document.createElement('th');
         th.textContent = window.cleanString(property);
         const td = document.createElement('td');
+        console.log(value);
         if (Array.isArray(value)) {
-          value.forEach((item, idx) => {
+          value.forEach((item) => {
             if (window.isUrl(item)) {
               const a = document.createElement('a');
               a.href = item;
               a.textContent = item;
               a.target = '_blank';
               td.appendChild(a);
+              td.appendChild(document.createElement('br'));
             } else {
               td.appendChild(document.createTextNode(item));
             }
-            if (idx < value.length - 1)
-              td.appendChild(document.createTextNode(', '));
           });
         } else {
           if (typeof value === 'string' && window.isUrl(value)) {
