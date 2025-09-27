@@ -88,3 +88,7 @@ window.createDeleteButton = function(onclickHandler, payload = null, size = '20p
 
   return button;
 };
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
