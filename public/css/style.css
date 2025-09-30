@@ -1,6 +1,6 @@
 @font-face {
     font-family: 'Bunchlo';
-    src: url('../assets/bunchlo/bungc.woff2') format('woff2'),
+    src: url('/leabharlann/assets/bunchlo/bungc.woff2') format('woff2'),
     font-weight: normal;
     font-style: normal;
 }
@@ -24,7 +24,9 @@ header .navbar-brand {
   display: flex;
   align-items: center;
 }
-header .navbar-nav .nav-link .navbar-text { color: white; }
+header .navbar-nav .nav-link .navbar-text {
+  color: white;
+}
 #content, #welcome-message {
   margin: 1rem auto;
   max-width: 1200px;

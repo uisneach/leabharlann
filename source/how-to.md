@@ -116,12 +116,22 @@ A list of all currently used labels and when / how to use each:
 
 <a id="publisher"></a>
 ### Publisher
+> An organization or person that publishes works on any medium. 
 
 ### Translation
+> A Translation is an Edition which has been translated from its native language to another language. A Translation must have a [Translator](#Translator) and derive from a source [Text](#Text) or [Version](#Version), which represents the work in its native language (though these requirements aren't enforced in the database code).
+>
+> Certain ancient Texts can also be Translations. For example, the [Latin Vulgate Bible](https://en.wikipedia.org/wiki/Vulgate) is a translation of a number of previous Biblical texts in Old Italic, Greek, Hebrew, etc., translated by Saint Jerome; yet it is an important divergence from those source texts in its own right, and there are many [Versions](#Version) of the Vulgate, so it may be both a Text, not an Edition, and a Translation at once.
 
 ## Relationships
 
 ## WROTE
-> Points from an Author to a Text or Edition that he wrote. This should also be used for the editor of a work, even if that person didn't specifically author the text itself.
+> Points from an [Author](#Author) to a [Text](#Text) or [Edition](#Edition) that he wrote. This should also be used for the editor of a work, even if that person didn't specifically author the text itself.
+
+## PUBLISHED
+
+## TRANSLATED
+
+## VERSION_OF
 
 </section>

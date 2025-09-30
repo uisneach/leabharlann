@@ -828,20 +828,101 @@ app.delete('/nodes/:id/property/:key', requireAuth, async (req, res, next) => {
  *         description: Source or target node not found
  */
 app.post('/relation', requireAuth, async (req, res, next) => {
-  const { sourceNodeId, targetNodeId, relType, relProps = {} } = req.body;
-  if (!relType || !sourceNodeId || !targetNodeId) {
+  const { sourceNodeId, targetNodeId, relType: rawRelType, relProps = {} } = req.body;
+
+  // Basic presence check
+  if (!rawRelType || !sourceNodeId || !targetNodeId) {
     return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'All fields are required.' } });
   }
-  if (!validIdentifier(relType)) {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Invalid relationship type format.' } });
+
+  // Normalize + sanitize relationship type: uppercase, trimmed
+  const relType = String(rawRelType).trim().toUpperCase();
+
+  // Strict token validation for the relationship type.
+  // Only allow A-Z, 0-9 and underscore, must start with a letter or underscore, max length 64.
+  const RELTYPE_RE = /^[A-Z_][A-Z0-9_]{0,63}$/;
+  if (!RELTYPE_RE.test(relType)) {
+    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Invalid relationship type format. Allowed: A-Z, 0-9, underscore; must start with letter/underscore; max 64 chars.' } });
   }
+
+  // Validate property keys
   for (const prop in relProps) {
     if (!validIdentifier(prop)) {
-      return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: `Invalid relationship property: ${prop}` } });
+      return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: `Invalid relationship property name: ${prop}` } });
     }
   }
+
+  // Sanitize values: allow primitives (string, number, boolean, null) and arrays of primitives only.
+  // Truncate long strings; reject nested objects.
+  function sanitizeRelProps(input) {
+    const out = {};
+    const MAX_STRING = 2000;      // limit single-string length
+    const MAX_ARRAY_LEN = 200;    // max items in an array
+    const MAX_PROP_COUNT = 50;    // limit number of properties
+
+    const keys = Object.keys(input || {});
+    if (keys.length > MAX_PROP_COUNT) {
+      return { error: `Too many relationship properties (max ${MAX_PROP_COUNT})` };
+    }
+
+    for (const key of keys) {
+      let val = input[key];
+
+      // explicit server-side protection: never allow client to set createdBy
+      if (key === 'createdBy' || key === 'created_by') {
+        // skip it; server will set createdBy
+        continue;
+      }
+
+      if (val === null) {
+        out[key] = null;
+        continue;
+      }
+
+      const t = typeof val;
+      if (t === 'string') {
+        // trim and truncate
+        const s = val.trim();
+        out[key] = s.length > MAX_STRING ? s.slice(0, MAX_STRING) : s;
+      } else if (t === 'number' || t === 'boolean') {
+        out[key] = val;
+      } else if (Array.isArray(val)) {
+        if (val.length > MAX_ARRAY_LEN) {
+          return { error: `Array too long for property ${key} (max ${MAX_ARRAY_LEN})` };
+        }
+        const sanitizedArray = [];
+        for (const item of val) {
+          if (item === null) { sanitizedArray.push(null); continue; }
+          const it = typeof item;
+          if (it === 'string') {
+            const s = item.trim();
+            sanitizedArray.push(s.length > MAX_STRING ? s.slice(0, MAX_STRING) : s);
+          } else if (it === 'number' || it === 'boolean') {
+            sanitizedArray.push(item);
+          } else {
+            return { error: `Invalid array element type for property ${key}` };
+          }
+        }
+        out[key] = sanitizedArray;
+      } else {
+        // nested objects / maps are not allowed as property values
+        return { error: `Invalid property value for ${key}. Only primitives or arrays of primitives allowed.` };
+      }
+    }
+    return { props: out };
+  }
+
+  const sanitized = sanitizeRelProps(relProps);
+  if (sanitized && sanitized.error) {
+    return res.status(400).json({ error: { code: 'INVALID_PROPERTY_VALUE', message: sanitized.error } });
+  }
+
+  // Merge sanitized props and enforce server-side createdBy
+  const finalRelProps = { ...(sanitized.props || {}), createdBy: req.user.username };
+
   const session = driver.session();
   try {
+    // Confirm source node exists and check permission
     const checkResult = await session.run(
       `MATCH (a:Entity { nodeId: $sourceNodeId }) RETURN a.createdBy AS createdBy`,
       { sourceNodeId }
@@ -850,35 +931,53 @@ app.post('/relation', requireAuth, async (req, res, next) => {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Source node not found' } });
     }
     const createdBy = checkResult.records[0].get('createdBy');
+
+    // Only allow non-admin users to create relationships from nodes they created
     if (req.user.role !== 'admin' && createdBy !== req.user.username) {
       return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only create relationships from nodes you created' } });
     }
-    const result = await session.run(
-      `
-      MATCH (a:Entity {nodeId: $sourceNodeId})
-      MATCH (b:Entity {nodeId: $targetNodeId})
-      CREATE (a)-[r:\`${relType}\`]->(b)
+
+    // Create relationship inside a write transaction.
+    // NOTE: relType is injected directly into the Cypher text as a token, but it's been sanitized.
+    // All user data (node ids and rel properties) are passed as parameters to avoid injection.
+    const createCypher = `
+      MATCH (a:Entity { nodeId: $sourceNodeId })
+      MATCH (b:Entity { nodeId: $targetNodeId })
+      CREATE (a)-[r:${relType}]->(b)
       SET r += $relProps
       SET r.createdBy = $username
       RETURN id(r) AS relId, type(r) AS type, properties(r) AS props
-      `,
-      { sourceNodeId, targetNodeId, relProps: { ...relProps, createdBy: req.user.username }, username: req.user.username }
+    `;
+
+    const txResult = await session.writeTransaction(tx =>
+      tx.run(createCypher, {
+        sourceNodeId,
+        targetNodeId,
+        relProps: finalRelProps,
+        username: req.user.username
+      })
     );
-    if (result.records.length === 0) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Target node not found' } });
+
+    if (!txResult || txResult.records.length === 0) {
+      // If no records returned, assume target node not found or the create didn't happen.
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Target node not found or relationship not created.' } });
     }
-    const record = result.records[0];
+
+    const record = txResult.records[0];
     res.status(201).json({
       id: record.get('relId').toString(),
       type: record.get('type'),
       properties: record.get('props')
     });
   } catch (err) {
+    // Log the error server-side for diagnostics but avoid leaking details to clients.
+    console.error('Error creating relation:', err);
     next(err);
   } finally {
     await session.close();
   }
 });
+
 
 // --- Get Node Relationships ---
 /**
