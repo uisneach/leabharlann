@@ -152,6 +152,49 @@ async function getLabels() {
   return apiRequest('GET', '/labels');
 }
 
+// PUT a new list of labels to a node
+async function updateLabels(nodeId, labels) {
+  if (!nodeId && nodeId !== 0) {
+    throw new Error('UpdateLabels: nodeId is required');
+  }
+
+  // Normalize labels into an array:
+  // - If labels is already an array, use it.
+  // - If labels is null/undefined -> treat as empty array (reject below).
+  // - Otherwise coerce to string and treat as a single-element array.
+  let normalized;
+  if (Array.isArray(labels)) {
+    normalized = labels.slice(); // shallow copy
+  } else if (labels == null) {
+    normalized = [];
+  } else {
+    // For non-array scalars (string, number, boolean, etc.) coerce to string.
+    normalized = [String(labels)];
+  }
+
+  // Coerce each to a trimmed string
+  const sanitized = normalized.map(l => (l == null ? '' : String(l).trim()));
+
+  // Basic client-side validation: must be a non-empty array and valid Cypher identifiers
+  if (!Array.isArray(sanitized) || sanitized.length === 0) {
+    throw new TypeError('UpdateLabels: labels must be a non-empty array or a non-empty string');
+  }
+
+  // Server regex: /^[a-zA-Z_][a-zA-Z0-9_]*$/
+  const invalid = sanitized.filter(l => !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(l));
+  if (invalid.length > 0) {
+    throw new Error(`UpdateLabels: invalid labels: ${invalid.join(', ')}`);
+  }
+
+  const path = `/nodes/${encodeURIComponent(nodeId)}/labels`;
+  const response = await apiRequest('PUT', path, { labels: sanitized });
+
+  const data = await response.json();
+  return data;
+}
+
+
+
 // Get all nodes with a given label
 async function getNodesByLabel(label) {
   return apiRequest('GET', `/search/${encodeURIComponent(label)}`);
