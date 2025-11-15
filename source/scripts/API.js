@@ -193,8 +193,6 @@ async function updateLabels(nodeId, labels) {
   return data;
 }
 
-
-
 // Get all nodes with a given label
 async function getNodesByLabel(label) {
   return apiRequest('GET', `/search/${encodeURIComponent(label)}`);

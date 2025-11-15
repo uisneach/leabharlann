@@ -3,16 +3,13 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const neo4j = require('neo4j-driver');
 const cors = require('cors');
+const helmet = require('helmet');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
-
-const app = express();
-app.use(express.json());
-app.use(cors());
 
 // --- Neo4j Driver ---
 const driver = neo4j.driver(
@@ -22,6 +19,13 @@ const driver = neo4j.driver(
 
 // --- JWT Secret ---
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
+
+// --- Define Middleware ---
+const app = express();
+app.set('trust proxy', 1); // Allow for one reverse proxy in the network path (i.e. Render's)
+app.use(cors());
+app.use(helmet());
+app.use(express.json({ limit: '50kb' })); // Limit payload size to 50kb
 
 // --- Rate Limiting ---
 const limiter = rateLimit({
@@ -76,6 +80,51 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+
+// --- Custom String Sanitization Middleware ---
+const SANITIZATION_REGEX = /[^\p{L}\p{N}\p{P}\p{Z}\s]/gu; // Allow Unicode letters (e.g., Gaelic á), numbers, punctuation, spaces; block others
+const CYPHER_KEYWORDS = ['MATCH', 'DELETE', 'MERGE', 'SET', 'REMOVE', 'RETURN', 'UNWIND', 'CALL', '--', '/*']; // Potential injection indicators
+
+function sanitizeString(value) {
+  if (typeof value === 'string') {
+    value = value.trim(); // Trim whitespace
+    // Check for Cypher injection markers
+    for (const keyword of CYPHER_KEYWORDS) {
+      if (value.toUpperCase().includes(keyword)) {
+        throw new Error(`Potential injection detected in input: ${keyword}`);
+      }
+    }
+    // Restrict to standard characters
+    value = value.replace(SANITIZATION_REGEX, ''); // Remove disallowed chars
+    return value;
+  }
+  return value; // Non-strings pass through
+}
+
+function sanitizeObject(obj) {
+  if (typeof obj !== 'object' || obj === null) {
+    return sanitizeString(obj);
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeObject);
+  }
+  const sanitized = {};
+  for (const key in obj) {
+    sanitized[key] = sanitizeObject(obj[key]);
+  }
+  return sanitized;
+}
+
+app.use((req, res, next) => {
+  try {
+    if (req.body) req.body = sanitizeObject(req.body);
+    if (req.query) req.query = sanitizeObject(req.query);
+    if (req.params) req.params = sanitizeObject(req.params);
+    next();
+  } catch (err) {
+    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: err.message } });
+  }
+});
 
 // --- User Registration ---
 /**
@@ -324,11 +373,6 @@ app.post('/refresh', async (req, res, next) => {
  */
 app.get('/nodes', async (req, res, next) => {
   const { label, limit = 10, offset = 0 } = req.query;
-  
-  // Validate label: must be a valid Cypher identifier (alphanumeric + underscore, no spaces/special chars)
-  if (label && !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(label)) {
-    return res.status(400).json({ error: { code: 'INVALID_LABEL', message: 'Invalid label format' } });
-  }
 
   // Validate and parse limit/offset: must be non-negative integers, limit capped at 100
   const parsedLimit = parseInt(limit, 10);
@@ -491,9 +535,6 @@ app.put('/nodes/:id/labels', requireAuth, requireAdmin, async (req, res, next) =
   if (invalidLabels.length > 0) {
     return res.status(400).json({ error: { code: 'INVALID_LABELS', message: 'All labels must be valid Cypher identifiers' } });
   }
-
-  // Assume auth middleware runs first; add admin check here if user role is available in req.user
-  // e.g., if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Admin access required' } });
 
   const session = driver.session();
   try {

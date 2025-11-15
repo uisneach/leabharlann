@@ -488,7 +488,7 @@
     <div class="mt-3">
       <button id="editPropertiesBtn" class="btn btn-primary me-2" style="display: none;">Edit Properties</button>
       <button id="editLabelsBtn" class="btn btn-primary me-2" style="display: none;">Edit Labels</button>
-      <button id="deleteNodeBtn" class="btn btn-danger" style="display: none;">Delete Node</button>
+      <button id="deleteNodeButtonBtn" class="btn btn-danger" style="display: none;">Delete Node</button>
     </div>
     <div id="editPropertiesForm" class="mt-3" style="display: none;">
       <form id="updateForm">
@@ -623,7 +623,7 @@
     document.getElementById('createRelationshipBtn').style.display = isAuthenticated ? 'block' : 'none';
     document.getElementById('editPropertiesBtn').style.display = isAuthenticated ? 'block' : 'none';
     document.getElementById('editLabelsBtn').style.display = isAuthenticated ? 'block' : 'none';
-    document.getElementById('deleteNodeBtn').style.display = isAuthenticated ? 'block' : 'none';
+    document.getElementById('deleteNodeButtonBtn').style.display = isAuthenticated ? 'block' : 'none';
     document.querySelectorAll('.delete-property-btn').forEach(btn => {
       btn.style.display = isAuthenticated ? 'inline-block' : 'none';
     });
@@ -836,14 +836,13 @@
     }
   }
 
-  async function deleteNode() {
+  async function deleteNodeButton() {
     if (!confirm('Are you sure you want to delete this node and all its relationships?')) return;
     try {
       const response = await deleteNode(nodeId);
       if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete node');
     } catch (error) {
-      document.getElementById('updateErrorMessage').style.display = 'block';
-      document.getElementById('updateErrorMessage').textContent = error.message;
+      showTimedAlert(error.message);
     }
   }
 
@@ -910,7 +909,7 @@
     document.getElementById('editLabelsForm').style.display = 'none';
     document.getElementById('editPropertiesBtn').style.display = 'none';
     document.getElementById('editLabelsBtn').style.display = 'none';
-    document.getElementById('deleteNodeBtn').style.display = 'none';
+    document.getElementById('deleteNodeButtonBtn').style.display = 'none';
     document.getElementById('propertiesDisplay').style.display = 'none';
   });
 
@@ -919,7 +918,7 @@
     document.getElementById('editPropertiesForm').style.display = 'none';
     document.getElementById('editPropertiesBtn').style.display = 'none';
     document.getElementById('editLabelsBtn').style.display = 'none';
-    document.getElementById('deleteNodeBtn').style.display = 'none';
+    document.getElementById('deleteNodeButtonBtn').style.display = 'none';
   });
 
   document.getElementById('cancelEdit').addEventListener('click', () => {
@@ -927,7 +926,7 @@
     document.getElementById('editLabelsForm').style.display = 'none';
     document.getElementById('editPropertiesBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
     document.getElementById('editLabelsBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
-    document.getElementById('deleteNodeBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
+    document.getElementById('deleteNodeButtonBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
     document.getElementById('propertiesDisplay').style.display = 'block';
   });
 
@@ -936,7 +935,7 @@
     document.getElementById('editPropertiesForm').style.display = 'none';
     document.getElementById('editPropertiesBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
     document.getElementById('editLabelsBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
-    document.getElementById('deleteNodeBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
+    document.getElementById('deleteNodeButtonBtn').style.display = localStorage.getItem('token') ? 'block' : 'none';
     document.getElementById('propertiesDisplay').style.display = 'block';
   });
 
@@ -971,7 +970,7 @@
     }
   });
 
-  document.getElementById('deleteNodeBtn').addEventListener('click', deleteNode);
+  document.getElementById('deleteNodeButtonBtn').addEventListener('click', deleteNodeButton);
 
   document.getElementById('updateForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -1008,7 +1007,7 @@
       document.getElementById('updateErrorMessage').style.display = 'none';
       document.getElementById('editPropertiesForm').style.display = 'none';
       document.getElementById('editPropertiesBtn').style.display = 'block';
-      document.getElementById('deleteNodeBtn').style.display = 'block';
+      document.getElementById('deleteNodeButtonBtn').style.display = 'block';
       document.getElementById('propertiesDisplay').style.display = 'block';
 
       const relRes = await getRelations(nodeId);
@@ -1055,7 +1054,7 @@
       document.getElementById('editLabelsForm').style.display = 'none';
       document.getElementById('editPropertiesBtn').style.display = 'block';
       document.getElementById('editLabelsBtn').style.display = 'block';
-      document.getElementById('deleteNodeBtn').style.display = 'block';
+      document.getElementById('deleteNodeButtonBtn').style.display = 'block';
 
       const relRes = await getRelations(nodeId);
       if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
