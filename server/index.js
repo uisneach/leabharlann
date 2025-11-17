@@ -341,228 +341,6 @@ app.post('/refresh', async (req, res, next) => {
   }
 });
 
-// --- Get Nodes ---
-/**
- * @openapi
- * /nodes:
- *   get:
- *     summary: Get nodes with optional label filter
- *     parameters:
- *       - name: label
- *         in: query
- *         description: Label to filter nodes
- *         schema:
- *           type: string
- *       - name: limit
- *         in: query
- *         description: Number of nodes to return
- *         schema:
- *           type: integer
- *           default: 10
- *       - name: offset
- *         in: query
- *         description: Number of nodes to skip
- *         schema:
- *           type: integer
- *           default: 0
- *     responses:
- *       200:
- *         description: List of nodes
- *       400:
- *         description: Invalid input
- */
-app.get('/nodes', async (req, res, next) => {
-  const { label, limit = 10, offset = 0 } = req.query;
-
-  // Validate and parse limit/offset: must be non-negative integers, limit capped at 100
-  const parsedLimit = parseInt(limit, 10);
-  const parsedOffset = parseInt(offset, 10);
-  if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
-    return res.status(400).json({ error: { code: 'INVALID_LIMIT', message: 'Limit must be an integer between 1 and 100' } });
-  }
-  if (isNaN(parsedOffset) || parsedOffset < 0) {
-    return res.status(400).json({ error: { code: 'INVALID_OFFSET', message: 'Offset must be a non-negative integer' } });
-  }
-
-  const session = driver.session();
-  try {
-    const cypher = label
-      ? `MATCH (n:Entity:\`${label}\`) RETURN n SKIP $offset LIMIT $limit`
-      : `MATCH (n:Entity) RETURN n SKIP $offset LIMIT $limit`;
-    const result = await session.run(cypher, { offset: neo4j.int(offset), limit: neo4j.int(limit) });
-    if (result.records.length === 0) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: `No nodes found${label ? ` with label ${label}` : ''}` } });
-    }
-    const nodes = result.records.map(record => {
-      const node = record.get('n');
-      return {
-        id: node.properties.nodeId,
-        labels: node.labels,
-        properties: node.properties
-      };
-    });
-    res.json(nodes);
-  } catch (err) {
-    next(err);
-  } finally {
-    await session.close();
-  }
-});
-
-// --- Get Node by ID ---
-/**
- * @openapi
- * /nodes/{id}:
- *   get:
- *     summary: Get a node by ID
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Node found
- *       404:
- *         description: Node not found
- */
-app.get('/nodes/:id', async (req, res, next) => {
-  const { id } = req.params;
-  const session = driver.session();
-  try {
-    const result = await session.run(
-      'MATCH (n:Entity {nodeId: $nodeId}) RETURN n',
-      { nodeId: id }
-    );
-    if (result.records.length === 0) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
-    }
-    const node = result.records[0].get('n');
-    res.json({
-      id: node.properties.nodeId,
-      labels: node.labels,
-      properties: node.properties
-    });
-  } catch (err) {
-    next(err);
-  } finally {
-    await session.close();
-  }
-});
-
-// --- Get List of Labels ---
-/**
- * @openapi
- * /labels:
- *   get:
- *     summary: Retrieve all unique labels in the database
- *     responses:
- *       200:
- *         description: List of all unique node labels
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 labels:
- *                   type: array
- *                   items:
- *                     type: string
- *                   description: Array of unique node labels
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Server error
- */
-app.get('/labels', async (req, res, next) => {
-  const session = driver.session();
-  try {
-    const result = await session.run('CALL db.labels()');
-    const labels = result.records
-      .map(record => record.get('label'))
-      .filter(label => label !== 'User');
-    res.status(200).json({ labels });
-  } catch (err) {
-    next(err);
-  } finally {
-    await session.close();
-  }
-});
-
-// --- Update Node Labels ---
-/**
- * @openapi
- * /nodes/{id}/labels:
- *   put:
- *     summary: Update labels on a node
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               labels:
- *                 type: array
- *                 items:
- *                   type: string
- *     responses:
- *       200:
- *         description: Labels updated successfully
- *       400:
- *         description: Invalid input
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Node not found
- */
-app.put('/nodes/:id/labels', requireAuth, requireAdmin, async (req, res, next) => {
-  const { id } = req.params;
-  const { labels } = req.body;
-
-  if (!Array.isArray(labels)) {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'labels must be an array of strings' } });
-  }
-
-  const invalidLabels = labels.filter(label => typeof label !== 'string' || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(label));
-  if (invalidLabels.length > 0) {
-    return res.status(400).json({ error: { code: 'INVALID_LABELS', message: 'All labels must be valid Cypher identifiers' } });
-  }
-
-  const session = driver.session();
-  try {
-    const cypher = `
-      MATCH (n:Entity {nodeId: $nodeId})
-      WITH n, [l IN labels(n) WHERE l <> 'Entity'] AS oldLabels
-      FOREACH(old IN oldLabels | REMOVE n:old)
-      WITH n
-      FOREACH(newLabel IN $labels | SET n:newLabel)
-      RETURN n
-    `;
-    const result = await session.run(cypher, { nodeId: id, labels });
-    if (result.records.length === 0) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
-    }
-    const node = result.records[0].get('n');
-    res.json({
-      id: node.properties.nodeId,
-      labels: node.labels,
-      properties: node.properties
-    });
-  } catch (err) {
-    next(err);
-  } finally {
-    await session.close();
-  }
-});
-
 // --- Create Node ---
 /**
  * @openapi
@@ -634,83 +412,6 @@ app.post('/nodes', requireAuth, async (req, res, next) => {
   }
 });
 
-// --- Update Node ---
-/**
- * @openapi
- * /nodes/{id}:
- *   put:
- *     summary: Update a node's properties
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               properties:
- *                 type: object
- *     responses:
- *       200:
- *         description: Node updated successfully
- *       400:
- *         description: Invalid input
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       404:
- *         description: Node not found
- */
-app.put('/nodes/:id', requireAuth, async (req, res, next) => {
-  const { id: nodeId } = req.params;
-  const { properties } = req.body;
-  if (!properties || typeof properties !== 'object') {
-    return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Properties must be an object' } });
-  }
-  for (const prop in properties) {
-    if (!validIdentifier(prop)) {
-      return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: `Invalid property: ${prop}` } });
-    }
-    if (prop === 'nodeId' || prop === 'createdBy') {
-      return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: 'Cannot modify nodeId or createdBy' } });
-    }
-  }
-  const session = driver.session();
-  try {
-    const checkResult = await session.run(
-      'MATCH (n:Entity {nodeId: $nodeId}) RETURN n.createdBy AS createdBy',
-      { nodeId }
-    );
-    if (checkResult.records.length === 0) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
-    }
-    const createdBy = checkResult.records[0].get('createdBy');
-    if (req.user.role !== 'admin' && createdBy !== req.user.username) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only update nodes you created' } });
-    }
-    const result = await session.run(
-      'MATCH (n:Entity {nodeId: $nodeId}) SET n += $properties RETURN n',
-      { nodeId, properties }
-    );
-    const node = result.records[0].get('n');
-    res.json({
-      id: node.properties.nodeId,
-      labels: node.labels,
-      properties: node.properties
-    });
-  } catch (err) {
-    next(err);
-  } finally {
-    await session.close();
-  }
-});
-
 // --- Delete Node ---
 /**
  * @openapi
@@ -761,7 +462,432 @@ app.delete('/nodes/:id', requireAuth, async (req, res, next) => {
   }
 });
 
-// --- Delete Property of Node ---
+// --- Get Node by ID ---
+/**
+ * @openapi
+ * /nodes/{id}:
+ *   get:
+ *     summary: Get a node by ID
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Node found
+ *       404:
+ *         description: Node not found
+ */
+app.get('/nodes/:id', async (req, res, next) => {
+  const { id } = req.params;
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      'MATCH (n:Entity {nodeId: $nodeId}) RETURN n',
+      { nodeId: id }
+    );
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+    }
+    const node = result.records[0].get('n');
+    res.json({
+      id: node.properties.nodeId,
+      labels: node.labels,
+      properties: node.properties
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Get Nodes ---
+/**
+ * @openapi
+ * /nodes:
+ *   get:
+ *     summary: Get nodes with optional label filter
+ *     parameters:
+ *       - name: label
+ *         in: query
+ *         description: Label to filter nodes
+ *         schema:
+ *           type: string
+ *       - name: limit
+ *         in: query
+ *         description: Number of nodes to return
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - name: offset
+ *         in: query
+ *         description: Number of nodes to skip
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: List of nodes
+ *       400:
+ *         description: Invalid input
+ */
+app.get('/nodes', async (req, res, next) => {
+  const { label, limit = 10, offset = 0 } = req.query;
+
+  // Validate and parse limit/offset: must be non-negative integers, limit capped at 100
+  const parsedLimit = parseInt(limit, 10);
+  const parsedOffset = parseInt(offset, 10);
+  if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
+    return res.status(400).json({ error: { code: 'INVALID_LIMIT', message: 'Limit must be an integer between 1 and 100' } });
+  }
+  if (isNaN(parsedOffset) || parsedOffset < 0) {
+    return res.status(400).json({ error: { code: 'INVALID_OFFSET', message: 'Offset must be a non-negative integer' } });
+  }
+
+  const session = driver.session();
+  try {
+    const cypher = label
+      ? `MATCH (n:Entity:\`${label}\`) RETURN n SKIP $offset LIMIT $limit`
+      : `MATCH (n:Entity) RETURN n SKIP $offset LIMIT $limit`;
+    const result = await session.run(cypher, { offset: neo4j.int(offset), limit: neo4j.int(limit) });
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: `No nodes found${label ? ` with label ${label}` : ''}` } });
+    }
+    const nodes = result.records.map(record => {
+      const node = record.get('n');
+      return {
+        id: node.properties.nodeId,
+        labels: node.labels,
+        properties: node.properties
+      };
+    });
+    res.json(nodes);
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Add Label to Node ---
+/**
+ * @openapi
+ * /nodes/{id}/labels/{label}:
+ *   put:
+ *     summary: Add a single label to the node.
+ *     description: Validates the provided label and adds it to the node's labels. Does not modify other labels. The reserved label "Entity" cannot be added.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: Node identifier (nodeId property)
+ *         schema:
+ *           type: string
+ *       - name: label
+ *         in: path
+ *         required: true
+ *         description: Label to add. Must match Cypher identifier rules.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$'
+ *     responses:
+ *       200:
+ *         description: Label added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 labels:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 properties:
+ *                   type: object
+ *                   additionalProperties: true
+ *       400:
+ *         description: Invalid input (bad label or reserved label)
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Node not found
+ */
+app.put('/nodes/:id/labels', requireAuth, async (req, res, next) => {
+    const { id } = req.params;
+    const { label } = req.body;
+
+    // Protect reserved label
+    if (label === 'Entity') {
+      return res.status(400).json({
+        error: { code: 'RESERVED_LABEL', message: 'Cannot add reserved label "Entity"' }
+      });
+    }
+
+    const session = driver.session();
+    try {
+      const cypher = `
+        MATCH (n:Entity {nodeId: $nodeId})
+        CALL apoc.create.addLabels(n, [$label]) YIELD node
+        RETURN node
+      `;
+      const result = await session.run(cypher, { nodeId: id, label });
+
+      if (result.records.length === 0) {
+        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+      }
+
+      const node = result.records[0].get('node');
+      res.json({
+        id: node.properties.nodeId,
+        labels: node.labels,
+        properties: node.properties
+      });
+    } catch (err) {
+      next(err);
+    } finally {
+      await session.close();
+    }
+  }
+);
+
+// --- Remove Label from Node ---
+/**
+ * @openapi
+ * /nodes/{id}/labels/{label}:
+ *   delete:
+ *     summary: Remove a single label from the node.
+ *     description: Validates the provided label and removes it from the node's labels if present. No-op if the node doesn't have the label. The reserved label "Entity" cannot be removed.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: Node identifier (nodeId property)
+ *         schema:
+ *           type: string
+ *       - name: label
+ *         in: path
+ *         required: true
+ *         description: Label to remove. Must match Cypher identifier rules.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$'
+ *     responses:
+ *       200:
+ *         description: Label removed (or no-op if label wasn't present)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 labels:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 properties:
+ *                   type: object
+ *                   additionalProperties: true
+ *       400:
+ *         description: Invalid input (bad label or reserved label)
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Node not found
+ */
+app.delete('/nodes/:id/labels/:label', requireAuth, async (req, res, next) => {
+    const { id, label } = req.params;
+
+    // Protect reserved label
+    if (label === 'Entity') {
+      return res.status(400).json({
+        error: { code: 'RESERVED_LABEL', message: 'Cannot remove reserved label "Entity"' }
+      });
+    }
+
+    const session = driver.session();
+    try {
+      const cypher = `
+        MATCH (n:Entity {nodeId: $nodeId})
+        CALL apoc.create.removeLabels(n, [$label]) YIELD node
+        RETURN node
+      `;
+      const result = await session.run(cypher, { nodeId: id, label });
+
+      if (result.records.length === 0) {
+        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+      }
+
+      const node = result.records[0].get('node');
+      res.json({
+        id: node.properties.nodeId,
+        labels: node.labels,
+        properties: node.properties
+      });
+    } catch (err) {
+      next(err);
+    } finally {
+      await session.close();
+    }
+  }
+);
+
+// --- Add New Property to Node ---
+/**
+ * @openapi
+ * /nodes/{id}/properties:
+ *   post:
+ *     summary: Create a new property on a node.
+ *     description: Creates a new property (key/value) on the specified node. Fails with 409 if the property already exists. The reserved property "nodeId" cannot be created or modified.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: Node identifier (nodeId property)
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       description: Object with `key` (property name) and `value` (primitive or array of primitives)
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - key
+ *               - value
+ *             properties:
+ *               key:
+ *                 type: string
+ *                 description: Property name (must match Cypher identifier rules)
+ *                 pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$'
+ *               value:
+ *                 description: Property value (string, number, boolean, null, or array of those)
+ *     responses:
+ *       201:
+ *         description: Property created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 labels:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 properties:
+ *                   type: object
+ *                   additionalProperties: true
+ *       400:
+ *         description: Invalid key or value, or attempt to modify reserved property
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Node not found
+ *       409:
+ *         description: Property already exists
+ */
+app.post('/nodes/:id/properties', requireAuth, async (req, res, next) => {
+  const { id } = req.params;
+  const { key, value } = req.body;
+
+  // Protect reserved properties
+  if (key === 'nodeId' || key === 'createdBy') {
+    return res.status(400).json({ error: { code: 'PROTECTED_PROPERTY', message: 'Cannot delete nodeId or createdBy' } });
+  }
+
+  const session = driver.session();
+  try {
+    // Check node exists and whether property already exists
+    const checkQ = `
+      MATCH (n:Entity {nodeId: $nodeId})
+      RETURN n, exists(n[$key]) AS hasProp
+    `;
+    const checkRes = await session.run(checkQ, { nodeId: id, key });
+
+    if (checkRes.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+    }
+
+    const hasProp = checkRes.records[0].get('hasProp');
+    if (hasProp) {
+      return res.status(409).json({ error: { code: 'ALREADY_EXISTS', message: `Property "${key}" already exists on this node` } });
+    }
+
+    // Create the property
+    const createQ = `
+      MATCH (n:Entity {nodeId: $nodeId})
+      SET n[$key] = $value
+      RETURN n
+    `;
+    const createRes = await session.run(createQ, { nodeId: id, key, value });
+
+    const node = createRes.records[0].get('n');
+    res.status(201).json({
+      id: node.properties.nodeId,
+      labels: node.labels,
+      properties: node.properties
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Edit Property on a Node
+app.put('/nodes/:id/properties', requireAuth, requireAdmin, async (req, res, next) => {
+  const { id, key } = req.params;
+  const { key, value } = req.body;
+
+  // Protect reserved properties
+  if (key === 'nodeId' || key === 'createdBy') {
+    return res.status(400).json({ error: { code: 'PROTECTED_PROPERTY', message: 'Cannot delete nodeId or createdBy' } });
+  }
+
+  const session = driver.session();
+  try {
+    // Check node exists and property exists
+    const checkQ = `
+      MATCH (n:Entity {nodeId: $nodeId})
+      RETURN n, exists(n[$key]) AS hasProp
+    `;
+    const checkRes = await session.run(checkQ, { nodeId: id, key });
+
+    if (checkRes.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+    }
+
+    const hasProp = checkRes.records[0].get('hasProp');
+    if (!hasProp) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND_PROPERTY', message: `Property "${key}" does not exist on this node` } });
+    }
+
+    // Update the property
+    const updateQ = `
+      MATCH (n:Entity {nodeId: $nodeId})
+      SET n[$key] = $value
+      RETURN n
+    `;
+    const updateRes = await session.run(updateQ, { nodeId: id, key, value });
+
+    const node = updateRes.records[0].get('n');
+    res.json({ id: node.properties.nodeId, labels: node.labels, properties: node.properties });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Delete a Property from a Node ---
 /**
  * @openapi
  * /nodes/{id}/property/{key}:
@@ -794,40 +920,118 @@ app.delete('/nodes/:id', requireAuth, async (req, res, next) => {
  */
 app.delete('/nodes/:id/property/:key', requireAuth, async (req, res, next) => {
   const { id: nodeId, key } = req.params;
+
   if (!validIdentifier(key)) {
     return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: 'Invalid property key format' } });
   }
+
+  // Protect reserved properties
   if (key === 'nodeId' || key === 'createdBy') {
     return res.status(400).json({ error: { code: 'PROTECTED_PROPERTY', message: 'Cannot delete nodeId or createdBy' } });
   }
+
   const session = driver.session();
   try {
+    // NOTE: use parameterized key access (exists(n[$key])) — DO NOT attempt to interpolate the key into the query string.
     const checkResult = await session.run(
-      'MATCH (n:Entity {nodeId: $nodeId}) RETURN n.createdBy AS createdBy, EXISTS(n.`${key}`) AS hasProperty',
-      { nodeId }
+      `
+      MATCH (n:Entity {nodeId: $nodeId})
+      RETURN n.createdBy AS createdBy, exists(n[$key]) AS hasProperty
+      `,
+      { nodeId, key }
     );
+
     if (checkResult.records.length === 0) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
     }
+
     const record = checkResult.records[0];
-    const createdBy = record.get('createdBy');
     const hasProperty = record.get('hasProperty');
+
     if (!hasProperty) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: `Property ${key} not found on node` } });
     }
-    if (req.user.role !== 'admin' && createdBy !== req.user.username) {
-      return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You can only delete properties from nodes you created' } });
-    }
-    const result = await session.run(
-      `MATCH (n:Entity {nodeId: $nodeId}) REMOVE n.\`${key}\` RETURN n`,
-      { nodeId }
+
+    // Safely remove the property by setting it to null (Neo4j removes null properties).
+    const deleteResult = await session.run(
+      `
+      MATCH (n:Entity {nodeId: $nodeId})
+      SET n[$key] = null
+      RETURN n
+      `,
+      { nodeId, key }
     );
-    const node = result.records[0].get('n');
+
+    const node = deleteResult.records[0].get('n');
     res.json({
       id: node.properties.nodeId,
       labels: node.labels,
       properties: node.properties
     });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Get Node Relationships ---
+/**
+ * @openapi
+ * /nodes/{id}/relations:
+ *   get:
+ *     summary: Get incoming and outgoing relationships for a node
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Relationships found
+ *       404:
+ *         description: Node not found
+ */
+app.get('/nodes/:id/relations', async (req, res, next) => {
+  const { id: nodeId } = req.params;
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `MATCH (n:Entity {nodeId: $nodeId})
+      OPTIONAL MATCH (n)-[outRel]->(outNode:Entity)
+      OPTIONAL MATCH (inNode:Entity)-[inRel]->(n)
+      RETURN
+        COLLECT(DISTINCT {
+          relId: id(outRel),
+          type:  type(outRel),
+          node: {
+            id:         outNode.nodeId,
+            labels:     labels(outNode),
+            properties: properties(outNode)
+          }
+        }) AS outgoing,
+        COLLECT(DISTINCT {
+          relId: id(inRel),
+          type:  type(inRel),
+          node: {
+            id:         inNode.nodeId,
+            labels:     labels(inNode),
+            properties: properties(inNode)
+          }
+        }) AS incoming`,
+      { nodeId }
+    );
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+    }
+
+    const record = result.records[0];
+    // Filter out any entries where relId is null (i.e. the optional match had no real rel)
+    const outgoing = record.get('outgoing').filter(r => r.relId !== null);
+    const incoming = record.get('incoming').filter(r => r.relId !== null);
+    res.json({ outgoing, incoming });
   } catch (err) {
     next(err);
   } finally {
@@ -1019,71 +1223,6 @@ app.post('/relation', requireAuth, async (req, res, next) => {
   }
 });
 
-
-// --- Get Node Relationships ---
-/**
- * @openapi
- * /nodes/{id}/relations:
- *   get:
- *     summary: Get incoming and outgoing relationships for a node
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Relationships found
- *       404:
- *         description: Node not found
- */
-app.get('/nodes/:id/relations', async (req, res, next) => {
-  const { id: nodeId } = req.params;
-  const session = driver.session();
-  try {
-    const result = await session.run(
-      `MATCH (n:Entity {nodeId: $nodeId})
-      OPTIONAL MATCH (n)-[outRel]->(outNode:Entity)
-      OPTIONAL MATCH (inNode:Entity)-[inRel]->(n)
-      RETURN
-        COLLECT(DISTINCT {
-          relId: id(outRel),
-          type:  type(outRel),
-          node: {
-            id:         outNode.nodeId,
-            labels:     labels(outNode),
-            properties: properties(outNode)
-          }
-        }) AS outgoing,
-        COLLECT(DISTINCT {
-          relId: id(inRel),
-          type:  type(inRel),
-          node: {
-            id:         inNode.nodeId,
-            labels:     labels(inNode),
-            properties: properties(inNode)
-          }
-        }) AS incoming`,
-      { nodeId }
-    );
-
-    if (result.records.length === 0) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
-    }
-
-    const record = result.records[0];
-    // Filter out any entries where relId is null (i.e. the optional match had no real rel)
-    const outgoing = record.get('outgoing').filter(r => r.relId !== null);
-    const incoming = record.get('incoming').filter(r => r.relId !== null);
-    res.json({ outgoing, incoming });
-  } catch (err) {
-    next(err);
-  } finally {
-    await session.close();
-  }
-});
-
 // --- Delete Relationship ---
 /**
  * @openapi
@@ -1172,111 +1311,45 @@ app.delete('/relation', requireAuth, async (req, res, next) => {
   }
 });
 
-// --- Delete Property of Relationship ---
+
+// --- Get List of Labels ---
 /**
  * @openapi
- * /relation/{id}/property/{key}:
- *   delete:
- *     summary: Delete a property from a relationship
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Internal Neo4j ID of the relationship
- *       - in: path
- *         name: key
- *         required: true
- *         schema:
- *           type: string
- *         description: Property key to delete
+ * /labels:
+ *   get:
+ *     summary: Retrieve all unique labels in the database
  *     responses:
  *       200:
- *         description: Property deleted successfully
- *       400:
- *         description: Invalid input or protected property
+ *         description: List of all unique node labels
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 labels:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   description: Array of unique node labels
  *       401:
  *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       404:
- *         description: Relationship or property not found
+ *       500:
+ *         description: Server error
  */
-app.delete('/relation/:id/property/:key', requireAuth, async (req, res, next) => {
-    const { id: relIdParam, key } = req.params;
-    if (!validIdentifier(key)) {
-      return res.status(400).json({
-          error: {
-            code: 'INVALID_PROPERTY',
-            message: 'Invalid property key format'
-          }
-        });
-    }
-    if (key === 'createdBy') {
-      return res.status(400).json({
-          error: {
-            code: 'PROTECTED_PROPERTY',
-            message: 'Cannot delete createdBy'
-          }
-        });
-    }
-    const session = driver.session();
-    try {
-      const checkCypher = `MATCH ()-[r]->() WHERE id(r) = $relId RETURN r.createdBy AS createdBy, (r.\`${key}\` IS NOT NULL) AS hasProperty`;
-      const checkResult = await session.run(checkCypher, {
-        relId: neo4j.int(relIdParam)
-      });
-
-      if (checkResult.records.length === 0) {
-        return res.status(404).json({
-            error: {
-              code: 'NOT_FOUND',
-              message: 'Relationship not found'
-            }
-          });
-      }
-
-      const checkRecord = checkResult.records[0];
-      const createdBy   = checkRecord.get('createdBy');
-      const hasProperty = checkRecord.get('hasProperty');
-
-      if (!hasProperty) {
-        return res.status(404).json({
-            error: {
-              code: 'NOT_FOUND',
-              message: `Property "${key}" not found on relationship`
-            }
-          });
-      }
-
-      if (req.user.role !== 'admin' && createdBy !== req.user.username) {
-        return res.status(403).json({
-            error: {
-              code: 'FORBIDDEN',
-              message: 'You can only delete properties from relationships you created'
-            }
-          });
-      }
-
-      const deleteCypher = `MATCH ()-[r]->() WHERE id(r) = $relId REMOVE r.\`${key}\` RETURN id(r) AS relId, type(r) AS type, properties(r) AS props`;
-      const deleteResult = await session.run(deleteCypher, {
-        relId: neo4j.int(relIdParam)
-      });
-
-      const deleteRecord = deleteResult.records[0];
-      res.json({
-        id:         deleteRecord.get('relId').toString(),
-        type:       deleteRecord.get('type'),
-        properties: deleteRecord.get('props')
-      });
-    } catch (err) {
-      next(err);
-    } finally {
-      await session.close();
-    }
+app.get('/labels', async (req, res, next) => {
+  const session = driver.session();
+  try {
+    const result = await session.run('CALL db.labels()');
+    const labels = result.records
+      .map(record => record.get('label'))
+      .filter(label => label !== 'User');
+    res.status(200).json({ labels });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
   }
-);
+});
 
 // --- Search Nodes ---
 /**

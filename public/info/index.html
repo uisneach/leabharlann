@@ -840,7 +840,10 @@
     if (!confirm('Are you sure you want to delete this node and all its relationships?')) return;
     try {
       const response = await deleteNode(nodeId);
-      if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete node');
+      if (!response.ok)
+        throw new Error((await response.json()).error.message || 'Failed to delete node');
+      else
+        window.location.reload();
     } catch (error) {
       showTimedAlert(error.message);
     }
@@ -852,22 +855,18 @@
       const response = await deleteProperty(nodeId, key);
       if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete property');
       const data = await response.json();
-      const relRes = await fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/relations`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const relRes = await getRelations(nodeId);
       if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
       const relData = await relRes.json();
       data.outgoing = relData.outgoing || [];
       data.incoming = relData.incoming || [];
       renderPage(data);
     } catch (error) {
-      document.getElementById('updateErrorMessage').style.display = 'block';
-      document.getElementById('updateErrorMessage').textContent = error.message;
+      showTimedAlert(error.message);
     }
   }
 
   async function deleteRelationship(sourceNodeId, targetNodeId, relType) {
-    console.log(sourceNodeId + "---" + targetNodeId + "---" + relType);
     if (!confirm('Are you sure you want to delete this relationship?')) return;
     try {
       const response = await deleteRelation(sourceNodeId, targetNodeId, relType);
@@ -882,21 +881,8 @@
       data.incoming = relData.incoming || [];
       renderPage(data);
     } catch (error) {
-      document.getElementById('updateErrorMessage').style.display = 'block';
-      document.getElementById('updateErrorMessage').textContent = error.message;
+      showTimedAlert(error.message);
     }
-  }
-
-  async function updateNodeLabels(nodeId, labels) {
-    const token = localStorage.getItem('token');
-    return fetch(`${API_BASE}/nodes/${encodeURIComponent(nodeId)}/labels`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ labels })
-    });
   }
 
   function typeFromLabel(labels) {
@@ -1047,7 +1033,7 @@
         window.location.href = 'index.html';
         return;
       }
-      const response = await updateNodeLabels(nodeId, labels);
+      const response = await updateLabels(nodeId, labels);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error.message || 'Failed to update labels');
       document.getElementById('updateLabelsErrorMessage').style.display = 'none';

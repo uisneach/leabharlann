@@ -1,5 +1,26 @@
 ## Server Structure
 
+Endpoints:
+- Nodes
+  - Create Node (POST /nodes)
+  - Delete Node (DELETE /nodes/:id)
+  - Find a Node (GET /nodes/:id)
+  - Labels
+    - Add Label to Node      (POST nodes/:id/labels)
+    - Remove Label from Node (DELETE nodes/:id/labels/:label)
+  - Properties
+    - Create Property         (POST /nodes/:id/properties/)
+    - Set (Existing) Property (PUT /nodes/:id/properties/)
+    - Remove Property         (DELETE /nodes/:id/properties/:key)
+  - Relationships
+    - Get Node Relationships  (GET /nodes/:id/relations)
+- Relationships
+  - Set Relationship    (POST /relations)
+  - Rename Relationship (PUT /relations)
+  - Remove Relationship (DELETE /relations) (Note: a relation does not have an ID but is determined by its source and target node, which are provided here as parameters.)
+- Database
+  - Get List of Labels          (GET /labels)
+  - Get List of Nodes by Label  (GET /nodes with 'label' parameter)
 
 ## Database Structure
 
