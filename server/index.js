@@ -844,7 +844,7 @@ app.post('/nodes/:id/properties', requireAuth, async (req, res, next) => {
 
 // --- Edit Property on a Node
 app.put('/nodes/:id/properties', requireAuth, requireAdmin, async (req, res, next) => {
-  const { id, key } = req.params;
+  const { id } = req.params;
   const { key, value } = req.body;
 
   // Protect reserved properties
