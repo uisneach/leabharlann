@@ -4,7 +4,7 @@ Endpoints:
 - Nodes
   - Create Node (POST /nodes)
   - Delete Node (DELETE /nodes/:id)
-  - Find a Node (GET /nodes/:id)
+  - Get a Node (GET /nodes/:id)
   - Labels
     - Add Label to Node      (POST nodes/:id/labels)
     - Remove Label from Node (DELETE nodes/:id/labels/:label)
@@ -19,8 +19,10 @@ Endpoints:
   - Rename Relationship (PUT /relations)
   - Remove Relationship (DELETE /relations) (Note: a relation does not have an ID but is determined by its source and target node, which are provided here as parameters.)
 - Database
-  - Get List of Labels          (GET /labels)
-  - Get List of Nodes by Label  (GET /nodes with 'label' parameter)
+  - Get List of Labels (GET /labels)
+  - Get List of Nodes  (GET /nodes)
+- Search
+  - Get List of Nodes by Label Filter (GET /nodes with optional 'label' parameter)
 
 ## Database Structure
 

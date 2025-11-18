@@ -504,74 +504,6 @@ app.get('/nodes/:id', async (req, res, next) => {
   }
 });
 
-// --- Get Nodes ---
-/**
- * @openapi
- * /nodes:
- *   get:
- *     summary: Get nodes with optional label filter
- *     parameters:
- *       - name: label
- *         in: query
- *         description: Label to filter nodes
- *         schema:
- *           type: string
- *       - name: limit
- *         in: query
- *         description: Number of nodes to return
- *         schema:
- *           type: integer
- *           default: 10
- *       - name: offset
- *         in: query
- *         description: Number of nodes to skip
- *         schema:
- *           type: integer
- *           default: 0
- *     responses:
- *       200:
- *         description: List of nodes
- *       400:
- *         description: Invalid input
- */
-app.get('/nodes', async (req, res, next) => {
-  const { label, limit = 10, offset = 0 } = req.query;
-
-  // Validate and parse limit/offset: must be non-negative integers, limit capped at 100
-  const parsedLimit = parseInt(limit, 10);
-  const parsedOffset = parseInt(offset, 10);
-  if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
-    return res.status(400).json({ error: { code: 'INVALID_LIMIT', message: 'Limit must be an integer between 1 and 100' } });
-  }
-  if (isNaN(parsedOffset) || parsedOffset < 0) {
-    return res.status(400).json({ error: { code: 'INVALID_OFFSET', message: 'Offset must be a non-negative integer' } });
-  }
-
-  const session = driver.session();
-  try {
-    const cypher = label
-      ? `MATCH (n:Entity:\`${label}\`) RETURN n SKIP $offset LIMIT $limit`
-      : `MATCH (n:Entity) RETURN n SKIP $offset LIMIT $limit`;
-    const result = await session.run(cypher, { offset: neo4j.int(offset), limit: neo4j.int(limit) });
-    if (result.records.length === 0) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: `No nodes found${label ? ` with label ${label}` : ''}` } });
-    }
-    const nodes = result.records.map(record => {
-      const node = record.get('n');
-      return {
-        id: node.properties.nodeId,
-        labels: node.labels,
-        properties: node.properties
-      };
-    });
-    res.json(nodes);
-  } catch (err) {
-    next(err);
-  } finally {
-    await session.close();
-  }
-});
-
 // --- Add Label to Node ---
 /**
  * @openapi
@@ -700,42 +632,42 @@ app.put('/nodes/:id/labels', requireAuth, async (req, res, next) => {
  *       404:
  *         description: Node not found
  */
-app.delete('/nodes/:id/labels/:label', requireAuth, async (req, res, next) => {
-    const { id, label } = req.params;
+app.delete('/nodes/:id/labels', requireAuth, async (req, res, next) => {
+  const { id } = req.params;
+  const { label } = req.body;
 
-    // Protect reserved label
-    if (label === 'Entity') {
-      return res.status(400).json({
-        error: { code: 'RESERVED_LABEL', message: 'Cannot remove reserved label "Entity"' }
-      });
-    }
-
-    const session = driver.session();
-    try {
-      const cypher = `
-        MATCH (n:Entity {nodeId: $nodeId})
-        CALL apoc.create.removeLabels(n, [$label]) YIELD node
-        RETURN node
-      `;
-      const result = await session.run(cypher, { nodeId: id, label });
-
-      if (result.records.length === 0) {
-        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
-      }
-
-      const node = result.records[0].get('node');
-      res.json({
-        id: node.properties.nodeId,
-        labels: node.labels,
-        properties: node.properties
-      });
-    } catch (err) {
-      next(err);
-    } finally {
-      await session.close();
-    }
+  // Protect reserved label
+  if (label === 'Entity') {
+    return res.status(400).json({
+      error: { code: 'RESERVED_LABEL', message: 'Cannot remove reserved label "Entity"' }
+    });
   }
-);
+
+  const session = driver.session();
+  try {
+    const cypher = `
+      MATCH (n:Entity {nodeId: $nodeId})
+      CALL apoc.create.removeLabels(n, [$label]) YIELD node
+      RETURN node
+    `;
+    const result = await session.run(cypher, { nodeId: id, label });
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+    }
+
+    const node = result.records[0].get('node');
+    res.json({
+      id: node.properties.nodeId,
+      labels: node.labels,
+      properties: node.properties
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
 
 // --- Add New Property to Node ---
 /**
@@ -918,8 +850,9 @@ app.put('/nodes/:id/properties', requireAuth, requireAdmin, async (req, res, nex
  *       404:
  *         description: Node or property not found
  */
-app.delete('/nodes/:id/property/:key', requireAuth, async (req, res, next) => {
-  const { id: nodeId, key } = req.params;
+app.delete('/nodes/:id/property', requireAuth, async (req, res, next) => {
+  const { id: nodeId } = req.params;
+  const { key } = req.body;
 
   if (!validIdentifier(key)) {
     return res.status(400).json({ error: { code: 'INVALID_PROPERTY', message: 'Invalid property key format' } });
@@ -1311,7 +1244,6 @@ app.delete('/relation', requireAuth, async (req, res, next) => {
   }
 });
 
-
 // --- Get List of Labels ---
 /**
  * @openapi
@@ -1452,6 +1384,74 @@ app.get('/search', async (req, res) => {
     res.status(500).json({
       error: { code: 'SERVER_ERROR', message: error.message }
     });
+  } finally {
+    await session.close();
+  }
+});
+
+// --- Get Nodes ---
+/**
+ * @openapi
+ * /nodes:
+ *   get:
+ *     summary: Get nodes with optional label filter
+ *     parameters:
+ *       - name: label
+ *         in: query
+ *         description: Label to filter nodes
+ *         schema:
+ *           type: string
+ *       - name: limit
+ *         in: query
+ *         description: Number of nodes to return
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - name: offset
+ *         in: query
+ *         description: Number of nodes to skip
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: List of nodes
+ *       400:
+ *         description: Invalid input
+ */
+app.get('/nodes', async (req, res, next) => {
+  const { label, limit = 10, offset = 0 } = req.query;
+
+  // Validate and parse limit/offset: must be non-negative integers, limit capped at 100
+  const parsedLimit = parseInt(limit, 10);
+  const parsedOffset = parseInt(offset, 10);
+  if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
+    return res.status(400).json({ error: { code: 'INVALID_LIMIT', message: 'Limit must be an integer between 1 and 100' } });
+  }
+  if (isNaN(parsedOffset) || parsedOffset < 0) {
+    return res.status(400).json({ error: { code: 'INVALID_OFFSET', message: 'Offset must be a non-negative integer' } });
+  }
+
+  const session = driver.session();
+  try {
+    const cypher = label
+      ? `MATCH (n:Entity:\`${label}\`) RETURN n SKIP $offset LIMIT $limit`
+      : `MATCH (n:Entity) RETURN n SKIP $offset LIMIT $limit`;
+    const result = await session.run(cypher, { offset: neo4j.int(offset), limit: neo4j.int(limit) });
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: `No nodes found${label ? ` with label ${label}` : ''}` } });
+    }
+    const nodes = result.records.map(record => {
+      const node = record.get('n');
+      return {
+        id: node.properties.nodeId,
+        labels: node.labels,
+        properties: node.properties
+      };
+    });
+    res.json(nodes);
+  } catch (err) {
+    next(err);
   } finally {
     await session.close();
   }
