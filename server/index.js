@@ -774,7 +774,8 @@ app.post('/nodes/:id/properties', requireAuth, async (req, res, next) => {
   }
 });
 
-// --- Edit Property on a Node
+// --- Edit Property on a Node ---
+// --- If the property does not yet exist, then the endpoint will first create it
 app.put('/nodes/:id/properties', requireAuth, requireAdmin, async (req, res, next) => {
   const { id } = req.params;
   const { key, value } = req.body;
@@ -798,20 +799,30 @@ app.put('/nodes/:id/properties', requireAuth, requireAdmin, async (req, res, nex
     }
 
     const hasProp = checkRes.records[0].get('hasProp');
-    if (!hasProp) {
-      return res.status(404).json({ error: { code: 'NOT_FOUND_PROPERTY', message: `Property "${key}" does not exist on this node` } });
+    if (!hasProp) { // Property does not yet exist, so we must create it
+
+      // Create the property with the value
+      const createQ = `
+        MATCH (n:Entity {nodeId: $nodeId})
+        SET n[$key] = $value
+        RETURN n
+      `;
+      const createRes = await session.run(createQ, { nodeId: id, key, value });
+      const node = createRes.records[0].get('n');
+      res.json({ id: node.properties.nodeId, labels: node.labels, properties: node.properties });
     }
+    else { // Property already exists, so we update it
+      // Update the property
+      const updateQ = `
+        MATCH (n:Entity {nodeId: $nodeId})
+        SET n[$key] = $value
+        RETURN n
+      `;
+      const updateRes = await session.run(updateQ, { nodeId: id, key, value });
 
-    // Update the property
-    const updateQ = `
-      MATCH (n:Entity {nodeId: $nodeId})
-      SET n[$key] = $value
-      RETURN n
-    `;
-    const updateRes = await session.run(updateQ, { nodeId: id, key, value });
-
-    const node = updateRes.records[0].get('n');
-    res.json({ id: node.properties.nodeId, labels: node.labels, properties: node.properties });
+      const node = updateRes.records[0].get('n');
+      res.json({ id: node.properties.nodeId, labels: node.labels, properties: node.properties });
+    }
   } catch (err) {
     next(err);
   } finally {

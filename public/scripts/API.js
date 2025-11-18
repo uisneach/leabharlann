@@ -142,80 +142,51 @@ async function createNode(labels, rawProperties) {
   return apiRequest('POST', '/nodes', { labels, properties });
 }
 
-// Get a node by ID
-async function getNode(id) {
-  return apiRequest('GET', `/nodes/${encodeURIComponent(id)}`);
-}
-
-// Get list of labels
-async function getLabels() {
-  return apiRequest('GET', '/labels');
-}
-
-// PUT a new list of labels to a node
-async function updateLabels(nodeId, labels) {
-  if (!nodeId && nodeId !== 0) {
-    throw new Error('UpdateLabels: nodeId is required');
-  }
-
-  // Normalize labels into an array:
-  // - If labels is already an array, use it.
-  // - If labels is null/undefined -> treat as empty array (reject below).
-  // - Otherwise coerce to string and treat as a single-element array.
-  let normalized;
-  if (Array.isArray(labels)) {
-    normalized = labels.slice(); // shallow copy
-  } else if (labels == null) {
-    normalized = [];
-  } else {
-    // For non-array scalars (string, number, boolean, etc.) coerce to string.
-    normalized = [String(labels)];
-  }
-
-  // Coerce each to a trimmed string
-  const sanitized = normalized.map(l => (l == null ? '' : String(l).trim()));
-
-  // Basic client-side validation: must be a non-empty array and valid Cypher identifiers
-  if (!Array.isArray(sanitized) || sanitized.length === 0) {
-    throw new TypeError('UpdateLabels: labels must be a non-empty array or a non-empty string');
-  }
-
-  // Server regex: /^[a-zA-Z_][a-zA-Z0-9_]*$/
-  const invalid = sanitized.filter(l => !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(l));
-  if (invalid.length > 0) {
-    throw new Error(`UpdateLabels: invalid labels: ${invalid.join(', ')}`);
-  }
-
-  const path = `/nodes/${encodeURIComponent(nodeId)}/labels`;
-  const response = await apiRequest('PUT', path, { labels: sanitized });
-
-  const data = await response.json();
-  return data;
-}
-
-// Get all nodes with a given label
-async function getNodesByLabel(label) {
-  return apiRequest('GET', `/search/${encodeURIComponent(label)}`);
-}
-
-// Update a node's properties
-async function updateNode(id, properties) {
-  return apiRequest('PUT', `/nodes/${encodeURIComponent(id)}`, { properties });
-}
-
 // Delete a node
 async function deleteNode(id) {
   return apiRequest('DELETE', `/nodes/${encodeURIComponent(id)}`);
 }
 
-// Delete a property from a node
+// Add a label to a node
+async function addLabel(id, label) {
+  return apiRequest('PUT', `/nodes/${encodeURIComponent(id)}/labels`, { label });
+}
+
+// Delete a label from a node
+async function deleteLabel(id, label) {
+  return apiRequest('DELETE', `/nodes/${encodeURIComponent(id)}/labels`, { label });
+}
+
+// Add a property to a node
+async function addProperty(id, key, value) {
+  return apiRequest('POST', `/nodes/${encodeURIComponent(id)}/properties`, { key, value });
+}
+
+// Change a property on a function
+async function setProperty(id, key, value) {
+  return apiRequest('PUT', `/nodes/${encodeURIComponent(id)}/properties`, { key, value });
+}
+
+async function setProperties(id, properties) {
+  let results = [];
+  for (let [key, value] in properties)
+    results.push(apiRequest('PUT', `/nodes/${encodeURIComponent(id)}/properties`, { key, value }));
+  return results;
+}
+
+// Delete property from a node
 async function deleteProperty(id, key) {
-  return apiRequest('DELETE', `/nodes/${encodeURIComponent(id)}/property/${encodeURIComponent(key)}`);
+  return apiRequest('DELETE', `/nodes/${encodeURIComponent(id)}/properties`, { key });
 }
 
 // Get relations for a node
 async function getRelations(id) {
   return apiRequest('GET', `/nodes/${encodeURIComponent(id)}/relations`);
+}
+
+// Get a node by ID
+async function getNode(id) {
+  return apiRequest('GET', `/nodes/${encodeURIComponent(id)}`);
 }
 
 // Create a relation
@@ -226,6 +197,16 @@ async function createRelation(sourceNodeId, targetNodeId, relType) {
 // Delete a relation
 async function deleteRelation(sourceNodeId, targetNodeId, relType) {
   return apiRequest('DELETE', '/relation', { sourceNodeId, targetNodeId, relType });
+}
+
+// Get list of labels
+async function getLabels() {
+  return apiRequest('GET', '/labels');
+}
+
+// Get all nodes with a given label
+async function getNodesByLabel(label) {
+  return apiRequest('GET', `/nodes?label=${encodeURIComponent(label)}&limit=100`);
 }
 
 // Search the database

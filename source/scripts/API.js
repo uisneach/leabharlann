@@ -167,6 +167,13 @@ async function setProperty(id, key, value) {
   return apiRequest('PUT', `/nodes/${encodeURIComponent(id)}/properties`, { key, value });
 }
 
+async function setProperties(id, properties) {
+  let results = [];
+  for (let [key, value] in properties)
+    results.push(apiRequest('PUT', `/nodes/${encodeURIComponent(id)}/properties`, { key, value }));
+  return results;
+}
+
 // Delete property from a node
 async function deleteProperty(id, key) {
   return apiRequest('DELETE', `/nodes/${encodeURIComponent(id)}/properties`, { key });
@@ -199,7 +206,7 @@ async function getLabels() {
 
 // Get all nodes with a given label
 async function getNodesByLabel(label) {
-  return apiRequest('GET', `/nodes?label=${encodeURIComponent(label)}`);
+  return apiRequest('GET', `/nodes?label=${encodeURIComponent(label)}&limit=100`);
 }
 
 // Search the database

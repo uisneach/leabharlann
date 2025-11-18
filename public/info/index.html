@@ -987,7 +987,7 @@
         window.location.href = 'index.html';
         return;
       }
-      const response = await updateNode(nodeId, properties);
+      const response = await setProperties(nodeId, properties);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error.message || 'Failed to update node');
       document.getElementById('updateErrorMessage').style.display = 'none';
