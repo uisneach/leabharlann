@@ -14,9 +14,9 @@ CSS: "markdown.css"
   }
 </style>
 
-# How to Use An Leabharlann Ghealach
+# How to Use An Leabharlann Ghaelach
 
-Welcome to **An Leabharlann Ghealach**, a database for Irish and Celtic source texts. This website will allow users to log and cite texts, keep track of secondary analyses, and discover new texts in the network. An Leabharlann will help keep track of all editions and translations of a text and where they can be found online.
+Welcome to **An Leabharlann Ghaelach**, a database for Irish and Celtic source texts. This website will allow users to log and cite texts, keep track of secondary analyses, and discover new texts in the network. An Leabharlann will help keep track of all editions and translations of a text and where they can be found online.
 
 ## Directory
 
