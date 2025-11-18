@@ -208,7 +208,6 @@ layout: layout.njk
         const th = document.createElement('th');
         th.textContent = window.cleanString(property);
         const td = document.createElement('td');
-        console.log(value);
         if (Array.isArray(value)) {
           value.forEach((item) => {
             if (window.isUrl(item)) {
@@ -235,7 +234,7 @@ layout: layout.njk
         }
         if (property !== 'nodeId' && property !== 'createdBy') {
           const deleteTd = document.createElement('td');
-          deleteTd.appendChild(window.createDeleteButton(deleteProperty, [property]));
+          deleteTd.appendChild(window.createDeleteButton(deletePropertyButton, [property]));
           tr.appendChild(deleteTd);
         }
         tr.prepend(td);
@@ -371,18 +370,14 @@ layout: layout.njk
     }
   }
 
-  async function deleteProperty(key) {
-    if (!confirm(`Are you sure you want to delete the property "${key}"?`)) return;
+  async function deletePropertyButton(key) {
+    if (!confirm(`Are you sure you want to delete the property "${key}"?`)) 
+      throw new Error('Deletion aborted.');
     try {
       const response = await deleteProperty(nodeId, key);
-      if (!response.ok) throw new Error((await response.json()).error.message || 'Failed to delete property');
-      const data = await response.json();
-      const relRes = await getRelations(nodeId);
-      if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
-      const relData = await relRes.json();
-      data.outgoing = relData.outgoing || [];
-      data.incoming = relData.incoming || [];
-      renderPage(data);
+      if (!response.ok)
+        throw new Error((await response.json()).error.message || 'Failed to delete property');
+      //window.location.reload();
     } catch (error) {
       showTimedAlert(error.message);
     }
@@ -497,36 +492,26 @@ layout: layout.njk
         }
         properties[name] = value || null;
       }
+
     });
-    if (invalidProp) {
-      document.getElementById('updateErrorMessage').style.display = 'block';
-      document.getElementById('updateErrorMessage').textContent = 'Property names can only contain letters, numbers, underscores, and cannot be nodeId or createdBy';
-      return;
-    }
+
+    if (invalidProp)
+      throw new Error('Property names can only contain letters, numbers, underscores, and cannot be nodeId or createdBy');
+    
     try {
       const token = localStorage.getItem('token');
       if (!token) {
         window.location.href = 'index.html';
         return;
       }
-      const response = await setProperties(nodeId, properties);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error.message || 'Failed to update node');
-      document.getElementById('updateErrorMessage').style.display = 'none';
-      document.getElementById('editPropertiesForm').style.display = 'none';
-      document.getElementById('editPropertiesBtn').style.display = 'block';
-      document.getElementById('deleteNodeButtonBtn').style.display = 'block';
-      document.getElementById('propertiesDisplay').style.display = 'block';
+      const results = await setProperties(nodeId, properties);
+      if (!Array.isArray(results)) {
+        throw new Error('Unexpected response from setProperties');
+      }
 
-      const relRes = await getRelations(nodeId);
-      if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
-      const relData = await relRes.json();
-      data.outgoing = relData.outgoing || [];
-      data.incoming = relData.incoming || [];
-      renderPage(data);
+      window.location.reload();
     } catch (error) {
-      document.getElementById('updateErrorMessage').style.display = 'block';
-      document.getElementById('updateErrorMessage').textContent = error.message;
+      showTimedAlert(error.message);
     }
   });
 
@@ -544,35 +529,38 @@ layout: layout.njk
         labels.push(label);
       }
     });
-    if (invalidLabel) {
-      document.getElementById('updateLabelsErrorMessage').style.display = 'block';
-      document.getElementById('updateLabelsErrorMessage').textContent = 'Labels must be valid identifiers (start with letter/underscore, followed by letters/numbers/underscores)';
-      return;
-    }
+
+    if (invalidLabel) 
+      throw new Error('Labels must be valid identifiers (start with letter/underscore, followed by letters/numbers/underscores)');
+    
     try {
       const token = localStorage.getItem('token');
       if (!token) {
         window.location.href = 'index.html';
         return;
       }
-      const response = await updateLabels(nodeId, labels);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error.message || 'Failed to update labels');
-      document.getElementById('updateLabelsErrorMessage').style.display = 'none';
-      document.getElementById('editLabelsForm').style.display = 'none';
-      document.getElementById('editPropertiesBtn').style.display = 'block';
-      document.getElementById('editLabelsBtn').style.display = 'block';
-      document.getElementById('deleteNodeButtonBtn').style.display = 'block';
 
-      const relRes = await getRelations(nodeId);
-      if (!relRes.ok) throw new Error(`Failed to load relationships: ${await relRes.text()}`);
-      const relData = await relRes.json();
-      data.outgoing = relData.outgoing || [];
-      data.incoming = relData.incoming || [];
-      renderPage(data);
+      // We must compare the list of submitted labels to the current list of applied labels.
+      // For each new label, we add it; for each missing label, we remove it; all other labels are ignored.
+      const labelsResponse = await getNode(nodeId);
+      const labelsResponseJson = await labelsResponse.json();
+      const appliedLabels = Array.isArray(labelsResponseJson.labels) ? labelsResponseJson.labels : [];
+
+      // Convert applied and submitted arrays to sets
+      const appliedSet = new Set(appliedLabels.map(s => s.charAt(0) + s.slice(1)));
+      const submittedSet = new Set(labels.map(s => s.charAt(0) + s.slice(1)));
+
+      // Perform boolean operations on set
+      const toAdd = labels.filter(l => !appliedSet.has(l));
+      const toRemove = Array.from(appliedSet).filter(l => l !== 'Entity' && !submittedSet.has(l));
+
+      const addResponse = await addLabels(nodeId, toAdd);
+      const removeResponse = await deleteLabels(nodeId, toRemove);
+      // Not sure what to do with these responses. Could check for failure codes, but why bother?
+
+      window.location.reload();
     } catch (error) {
-      document.getElementById('updateLabelsErrorMessage').style.display = 'block';
-      document.getElementById('updateLabelsErrorMessage').textContent = error.message;
+      showTimedAlert(error.message);
     }
   });
 

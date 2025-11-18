@@ -152,9 +152,45 @@ async function addLabel(id, label) {
   return apiRequest('PUT', `/nodes/${encodeURIComponent(id)}/labels`, { label });
 }
 
+// Add a whole list of labels at once
+async function addLabels(id, labels) {
+  if (!labels || !Array.isArray(labels)) {
+    throw new TypeError('labels must be a plain array.');
+  }
+  const results = [];
+  for (const label of labels) {
+    try {
+      const result = await apiRequest('PUT', `/nodes/${encodeURIComponent(id)}/labels`, { label });
+      results.push(result);
+    } catch (err) {
+      // rethrow with contextual info
+      throw new Error(`Failed to set label "${label}": ${err && err.message ? err.message : err}`);
+    }
+  }
+  return results;
+}
+
 // Delete a label from a node
 async function deleteLabel(id, label) {
   return apiRequest('DELETE', `/nodes/${encodeURIComponent(id)}/labels`, { label });
+}
+
+// Delete a whole list of labels at once
+async function deleteLabels(id, labels) {
+  if (!labels || !Array.isArray(labels)) {
+    throw new TypeError('labels must be a plain array.');
+  }
+  const results = [];
+  for (const label of labels) {
+    try {
+      const result = await apiRequest('DELETE', `/nodes/${encodeURIComponent(id)}/labels`, { label });
+      results.push(result);
+    } catch (err) {
+      // rethrow with contextual info
+      throw new Error(`Failed to remove label "${label}": ${err && err.message ? err.message : err}`);
+    }
+  }
+  return results;
 }
 
 // Add a property to a node
@@ -167,10 +203,23 @@ async function setProperty(id, key, value) {
   return apiRequest('PUT', `/nodes/${encodeURIComponent(id)}/properties`, { key, value });
 }
 
+// Change a whole list of properties at once
 async function setProperties(id, properties) {
-  let results = [];
-  for (let [key, value] in properties)
-    results.push(apiRequest('PUT', `/nodes/${encodeURIComponent(id)}/properties`, { key, value }));
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+    throw new TypeError('properties must be a plain object mapping keys to values');
+  }
+
+  const entries = Object.entries(properties);
+  const results = [];
+  for (const [key, value] of entries) {
+    try {
+      const result = await apiRequest('PUT', `/nodes/${encodeURIComponent(id)}/properties`, { key, value });
+      results.push({ key, result }); // result is whatever apiRequest resolves with
+    } catch (err) {
+      // rethrow with contextual info
+      throw new Error(`Failed to set property "${key}": ${err && err.message ? err.message : err}`);
+    }
+  }
   return results;
 }
 

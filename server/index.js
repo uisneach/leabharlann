@@ -83,7 +83,7 @@ function requireAdmin(req, res, next) {
 
 // --- Custom String Sanitization Middleware ---
 const SANITIZATION_REGEX = /[^\p{L}\p{N}\p{P}\p{Z}\s]/gu; // Allow Unicode letters (e.g., Gaelic á), numbers, punctuation, spaces; block others
-const CYPHER_KEYWORDS = ['MATCH', 'DELETE', 'MERGE', 'SET', 'REMOVE', 'RETURN', 'UNWIND', 'CALL', '--', '/*']; // Potential injection indicators
+const CYPHER_KEYWORDS = ['MATCH', 'DELETE', 'MERGE', 'REMOVE', 'RETURN', 'UNWIND', 'CALL', '--', '/*']; // Potential injection indicators
 
 function sanitizeString(value) {
   if (typeof value === 'string') {
@@ -550,42 +550,77 @@ app.get('/nodes/:id', async (req, res, next) => {
  *         description: Node not found
  */
 app.put('/nodes/:id/labels', requireAuth, async (req, res, next) => {
-    const { id } = req.params;
-    const { label } = req.body;
+  const { id } = req.params;
+  const { label } = req.body;
 
-    // Protect reserved label
-    if (label === 'Entity') {
-      return res.status(400).json({
-        error: { code: 'RESERVED_LABEL', message: 'Cannot add reserved label "Entity"' }
-      });
-    }
-
-    const session = driver.session();
-    try {
-      const cypher = `
-        MATCH (n:Entity {nodeId: $nodeId})
-        CALL apoc.create.addLabels(n, [$label]) YIELD node
-        RETURN node
-      `;
-      const result = await session.run(cypher, { nodeId: id, label });
-
-      if (result.records.length === 0) {
-        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
-      }
-
-      const node = result.records[0].get('node');
-      res.json({
-        id: node.properties.nodeId,
-        labels: node.labels,
-        properties: node.properties
-      });
-    } catch (err) {
-      next(err);
-    } finally {
-      await session.close();
-    }
+  if (typeof label !== 'string' || label.trim() === '') {
+    return res.status(400).json({ error: { code: 'INVALID_LABEL', message: 'Label must be a non-empty string' } });
   }
-);
+
+  // Trim and normalize: force first letter to uppercase
+  label = label.trim();
+  label = label.charAt(0).toUpperCase() + label.slice(1);
+
+  // Protect reserved label
+  if (label === 'Entity' || label === 'User' || label === 'Admin') {
+    return res.status(400).json({
+      error: { code: 'RESERVED_LABEL', message: 'Cannot add reserved label "$label"' }
+    });
+  }
+
+  const session = driver.session();
+  try {
+    // First we must check whether or not the label is already applied to the node.
+
+    // Fetch node and its labels
+    const fetchQ = `
+      MATCH (n:Entity {nodeId: $nodeId})
+      RETURN n, labels(n) AS labels
+    `;
+    const fetchRes = await session.run(fetchQ, { nodeId: id });
+
+    if (fetchRes.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+    }
+
+    const record = fetchRes.records[0];
+    const node = record.get('n');
+    const existingLabels = record.get('labels') || [];
+
+    // If node already has this label, return early
+    if (existingLabels.includes(label)) {
+      return res.json({
+        id: node.properties.nodeId,
+        labels: existingLabels,
+        properties: node.properties,
+        message: `Label "${label}" already present`
+      });
+    }
+
+    // Since no pre-existing label, we add the label
+    const cypher = `
+      MATCH (n:Entity {nodeId: $nodeId})
+      CALL apoc.create.addLabels(n, [$label]) YIELD node
+      RETURN node
+    `;
+    const result = await session.run(cypher, { nodeId: id, label });
+
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
+    }
+
+    const node = result.records[0].get('node');
+    res.json({
+      id: node.properties.nodeId,
+      labels: node.labels,
+      properties: node.properties
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    await session.close();
+  }
+});
 
 // --- Remove Label from Node ---
 /**
@@ -740,7 +775,7 @@ app.post('/nodes/:id/properties', requireAuth, async (req, res, next) => {
     // Check node exists and whether property already exists
     const checkQ = `
       MATCH (n:Entity {nodeId: $nodeId})
-      RETURN n, exists(n[$key]) AS hasProp
+      RETURN n, n[$key] IS NOT NULL AS hasProp
     `;
     const checkRes = await session.run(checkQ, { nodeId: id, key });
 
@@ -880,7 +915,7 @@ app.delete('/nodes/:id/property', requireAuth, async (req, res, next) => {
     const checkResult = await session.run(
       `
       MATCH (n:Entity {nodeId: $nodeId})
-      RETURN n.createdBy AS createdBy, exists(n[$key]) AS hasProperty
+      RETURN n.createdBy AS createdBy, n[$key] IS NOT NULL AS hasProperty
       `,
       { nodeId, key }
     );
