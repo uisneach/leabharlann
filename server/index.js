@@ -584,15 +584,15 @@ app.put('/nodes/:id/labels', requireAuth, async (req, res, next) => {
     }
 
     const record = fetchRes.records[0];
-    const node = record.get('n');
+    const node1 = record.get('n');
     const existingLabels = record.get('labels') || [];
 
     // If node already has this label, return early
     if (existingLabels.includes(label)) {
       return res.json({
-        id: node.properties.nodeId,
+        id: node1.properties.nodeId,
         labels: existingLabels,
-        properties: node.properties,
+        properties: node1.properties,
         message: `Label "${label}" already present`
       });
     }
@@ -609,10 +609,10 @@ app.put('/nodes/:id/labels', requireAuth, async (req, res, next) => {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Node not found' } });
     }
 
-    const node = result.records[0].get('node');
+    const node2 = result.records[0].get('node');
     res.json({
-      id: node.properties.nodeId,
-      labels: node.labels,
+      id: node2.properties.nodeId,
+      labels: node2.labels,
       properties: node.properties
     });
   } catch (err) {
