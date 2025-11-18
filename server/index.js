@@ -551,7 +551,7 @@ app.get('/nodes/:id', async (req, res, next) => {
  */
 app.put('/nodes/:id/labels', requireAuth, async (req, res, next) => {
   const { id } = req.params;
-  const { label } = req.body;
+  let { label } = req.body;
 
   if (typeof label !== 'string' || label.trim() === '') {
     return res.status(400).json({ error: { code: 'INVALID_LABEL', message: 'Label must be a non-empty string' } });
