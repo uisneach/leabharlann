@@ -790,7 +790,7 @@ app.put('/nodes/:id/properties', requireAuth, requireAdmin, async (req, res, nex
     // Check node exists and property exists
     const checkQ = `
       MATCH (n:Entity {nodeId: $nodeId})
-      RETURN n, exists(n[$key]) AS hasProp
+      RETURN n, n[$key] IS NOT NULL AS hasProp
     `;
     const checkRes = await session.run(checkQ, { nodeId: id, key });
 
