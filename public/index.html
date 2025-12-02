@@ -536,6 +536,23 @@
     const ul = document.getElementById(containerId);
     if (!ul) return;
     ul.innerHTML = '';
+
+    // Sort list alphabetically
+    // Make sure labelKeys is an array we can reuse for sorting and display
+    const keys = Array.isArray(labelKeys) ? labelKeys : [labelKeys];
+    const getTitle = (item) => {
+      const properties = item && item.properties ? item.properties : {};
+      const id = item && item.id ? String(item.id) : '';
+      const title = keys.reduce((result, key) => result || properties[key], '') || id || '';
+      // Normalize to string and to lower case for case-insensitive sort.
+      return String(title).trim().toLowerCase();
+    };
+    items.sort((a, b) => {
+      const ta = getTitle(a);
+      const tb = getTitle(b);
+      return ta.localeCompare(tb, undefined, { sensitivity: 'base', numeric: false });
+    });
+
     items.forEach(item => {
       const li = document.createElement('li');
       const a = document.createElement('a');
@@ -609,29 +626,30 @@
     });
   }
 
-  async function updateAddLabelDropdown() {
-    const select = document.getElementById('add-label-select');
-    select.innerHTML = '<option value="">Select a label</option>';
-    try {
-      const labels = await fetchLabels();
-      const activeLabels = Array.from(document.querySelectorAll('.col-md-4')).map(col => col.id.replace('col-', ''));
-      labels.forEach(label => {
-        if (!activeLabels.includes(label)) {
-          const option = document.createElement('option');
-          option.value = label;
-          option.textContent = label;
-          select.appendChild(option);
-        }
-      });
-    } catch (err) {
-      console.error('Error updating dropdown:', err);
-      const option = document.createElement('option');
-      option.value = '';
-      option.textContent = 'Failed to load labels';
-      option.disabled = true;
-      select.appendChild(option);
-    }
+async function updateAddLabelDropdown() {
+  const select = document.getElementById('add-label-select');
+  select.innerHTML = '<option value="">Select a label</option>';
+  try {
+    const labels = await fetchLabels();
+    labels.sort(); // Sort alphabetically
+    const activeLabels = Array.from(document.querySelectorAll('.col-md-4')).map(col => col.id.replace('col-', ''));
+    labels.forEach(label => {
+      if (!activeLabels.includes(label)) {
+        const option = document.createElement('option');
+        option.value = label;
+        option.textContent = label;
+        select.appendChild(option);
+      }
+    });
+  } catch (err) {
+    console.error('Error updating dropdown:', err);
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Failed to load labels';
+    option.disabled = true;
+    select.appendChild(option);
   }
+}
 
   async function loadHome() {
     try {

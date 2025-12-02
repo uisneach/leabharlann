@@ -98,7 +98,7 @@ A list of all currently used labels and when / how to use each:
 
 <a id="author"></a>
 ### Author
-> Used for all people who write, edit, or translate a [Text](#Text).
+> Used for all people who write, edit, or translate a [Text](#text).
 
 <a id="text"></a>
 ### Text
@@ -107,21 +107,51 @@ A list of all currently used labels and when / how to use each:
 > For example, the Iliad is a Text, written by Homer. Robert Fagles' 1990 book titled "The Iliad" by Homer, published by Penguin Classics, in which he translates the epic into English, is also the Iliad by Homer, but not the pure Text itself. Rather, it is an Edition and Translation of the Text.
 >
 > The Text is an umbrella category under which are organized all other nodes related to that Text.
+>
+> Works that count as commentary on another text are [Commentaries](#commentary) and also [Texts](#text) themselves, and can also be [Articles](#article).
 
 <a id="edition"></a>
 ### Edition
-> A printed or published instantiation of a [Text](#Text), which appears on its own as a standalone book or article, or is published in a journal, or is contained in an anthology.
+> A printed or published instantiation of a [Text](#text), which appears on its own as a standalone book or article, or is published in a journal, or is contained in an anthology.
 >
 >A book like *The Lord of the Rings: Return of the King* is a Text, and all the many printings and reprintings of that book are its **Editions**; but at the same time, a Text like the *Bretha Déin Chécht* was published in *Ériu* Vol. XX, along with a new translation, and both the original text and translation count as **Editions** of the original Text. 
+
+<a id="version"></a>
+### Version
+> A Version represents a major variant of a [Text](#text). A single Version implies the existence of other Versions from which it deviates. A Version should not also be a Text.
+>
+> For example, the [Táin Bó Cúailnge](https://uisneac.com/leabharlann/info/index.html?id=086bc4d3-d5a0-4db6-aeca-2bf91eda6bea) is a Text which is known to us from multiple manuscript editions which differ in content, so we represent each recension as a different Version, e.g. [Táin Bó Cúailnge (Recension II)](https://uisneac.com/leabharlann/info/index.html?id=4e9e7e5c-3cd1-452c-8903-e6b73f68fd59)
 
 <a id="publisher"></a>
 ### Publisher
 > An organization or person that publishes works on any medium. 
 
+<a id="translation"></a>
 ### Translation
-> A Translation is an Edition which has been translated from its native language to another language. A Translation must have a [Translator](#Translator) and derive from a source [Text](#Text) or [Version](#Version), which represents the work in its native language (though these requirements aren't enforced in the database code).
+> A Translation is an Edition which has been translated from its native language to another language. A Translation must have a [Translator](#translator) and derive from a source [Text](#text) or [Version](#version), which represents the work in its native language (though these requirements aren't enforced in the database code).
 >
 > Certain ancient Texts can also be Translations. For example, the [Latin Vulgate Bible](https://en.wikipedia.org/wiki/Vulgate) is a translation of a number of previous Biblical texts in Old Italic, Greek, Hebrew, etc., translated by Saint Jerome; yet it is an important divergence from those source texts in its own right, and there are many [Versions](#Version) of the Vulgate, so it may be both a Text, not an Edition, and a Translation at once.
+
+<a id="translator"></a>
+### Translator
+> A Translator is any person who translates a [Text](#text) from one language to another.
+
+<a id="commentary"></a>
+### Commentary
+> A Commentary is a [Text](#text) which is concerned in whole or in part with commentary on or critique of another Text.
+>
+> For example, the *Cath Maige Tuired* of Irish mythology is a [Text](https://uisneac.com/leabharlann/info/index.html?id=6b8fab4d-3722-4b49-80fb-a0a9c014da31), and the [Article](#article) by [Tomás Ó Cathasaigh](https://uisneac.com/leabharlann/info/index.html?id=c6673cd9-c00e-4a53-a46d-800c10f2f5e9) called [*Three Notes on the Cath Maige Tuired*](https://uisneac.com/leabharlann/info/index.html?id=bb36e67e-0361-4355-bdf3-d7144af4d48f) is a Text and a Commentary on another Text.
+
+<a id="journal"></a>
+### Journal
+> A Journal is an academic publication which periodically presents [Articles](#article) on a given subject, contained within [Issues](#issue). An Issue is linked to its Journal via the [ISSUE_OF](#issue-of) relationship.
+>
+> For example, [Revue Celtique](https://uisneac.com/leabharlann/info/index.html?id=949c5778-ece0-4e31-ac11-0d5962021771) is a Journal which publishes [Issues](#issue) such as [Revue Celtique Tome 9](https://uisneac.com/leabharlann/info/index.html?id=feb1dfcc-699b-487a-bace-a58dbabcdb61).
+
+### Issue
+> An Issue is a publication of a [Journal](#journal) which contains the [Articles](#article) presented by the journal. An Issue is linked to its Journal via the [ISSUE_OF](#issue-of) relationship.
+>
+> For example, [Revue Celtique](https://uisneac.com/leabharlann/info/index.html?id=949c5778-ece0-4e31-ac11-0d5962021771) is a Journal which publishes [Issues](#issue) such as [Revue Celtique Tome 9](https://uisneac.com/leabharlann/info/index.html?id=feb1dfcc-699b-487a-bace-a58dbabcdb61).
 
 ## Relationships
 
@@ -130,8 +160,14 @@ A list of all currently used labels and when / how to use each:
 
 ## PUBLISHED
 
+<a id="published-in"></a>
+## PUBLISHED_IN
+> Used on a [Text](#text) or [Article](#article) to indicate the [Journal](#journal), [Book](#book), or other publication that the Text is published within. Should point from the Text to the Journal.
+
 ## TRANSLATED
 
 ## VERSION_OF
+
+## ISSUE_OF
 
 </section>

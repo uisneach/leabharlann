@@ -558,7 +558,7 @@ graph LR
 <p><a id="author"></a></p>
 <h3>Author</h3>
 <blockquote>
-<p>Used for all people who write, edit, or translate a <a href="#Text">Text</a>.</p>
+<p>Used for all people who write, edit, or translate a <a href="#text">Text</a>.</p>
 </blockquote>
 <p><a id="text"></a></p>
 <h3>Text</h3>
@@ -566,22 +566,52 @@ graph LR
 <p>A Text is the pure form of a document or writing, the Platonic ideal of a text, not associated with any edition or translation.</p>
 <p>For example, the Iliad is a Text, written by Homer. Robert Fagles' 1990 book titled &quot;The Iliad&quot; by Homer, published by Penguin Classics, in which he translates the epic into English, is also the Iliad by Homer, but not the pure Text itself. Rather, it is an Edition and Translation of the Text.</p>
 <p>The Text is an umbrella category under which are organized all other nodes related to that Text.</p>
+<p>Works that count as commentary on another text are <a href="#commentary">Commentaries</a> and also <a href="#text">Texts</a> themselves, and can also be <a href="#article">Articles</a>.</p>
 </blockquote>
 <p><a id="edition"></a></p>
 <h3>Edition</h3>
 <blockquote>
-<p>A printed or published instantiation of a <a href="#Text">Text</a>, which appears on its own as a standalone book or article, or is published in a journal, or is contained in an anthology.</p>
+<p>A printed or published instantiation of a <a href="#text">Text</a>, which appears on its own as a standalone book or article, or is published in a journal, or is contained in an anthology.</p>
 <p>A book like <em>The Lord of the Rings: Return of the King</em> is a Text, and all the many printings and reprintings of that book are its <strong>Editions</strong>; but at the same time, a Text like the <em>Bretha Déin Chécht</em> was published in <em>Ériu</em> Vol. XX, along with a new translation, and both the original text and translation count as <strong>Editions</strong> of the original Text.</p>
+</blockquote>
+<p><a id="version"></a></p>
+<h3>Version</h3>
+<blockquote>
+<p>A Version represents a major variant of a <a href="#text">Text</a>. A single Version implies the existence of other Versions from which it deviates. A Version should not also be a Text.</p>
+<p>For example, the <a href="https://uisneac.com/leabharlann/info/index.html?id=086bc4d3-d5a0-4db6-aeca-2bf91eda6bea">Táin Bó Cúailnge</a> is a Text which is known to us from multiple manuscript editions which differ in content, so we represent each recension as a different Version, e.g. <a href="https://uisneac.com/leabharlann/info/index.html?id=4e9e7e5c-3cd1-452c-8903-e6b73f68fd59">Táin Bó Cúailnge (Recension II)</a></p>
 </blockquote>
 <p><a id="publisher"></a></p>
 <h3>Publisher</h3>
 <blockquote>
 <p>An organization or person that publishes works on any medium.</p>
 </blockquote>
+<p><a id="translation"></a></p>
 <h3>Translation</h3>
 <blockquote>
-<p>A Translation is an Edition which has been translated from its native language to another language. A Translation must have a <a href="#Translator">Translator</a> and derive from a source <a href="#Text">Text</a> or <a href="#Version">Version</a>, which represents the work in its native language (though these requirements aren't enforced in the database code).</p>
+<p>A Translation is an Edition which has been translated from its native language to another language. A Translation must have a <a href="#translator">Translator</a> and derive from a source <a href="#text">Text</a> or <a href="#version">Version</a>, which represents the work in its native language (though these requirements aren't enforced in the database code).</p>
 <p>Certain ancient Texts can also be Translations. For example, the <a href="https://en.wikipedia.org/wiki/Vulgate">Latin Vulgate Bible</a> is a translation of a number of previous Biblical texts in Old Italic, Greek, Hebrew, etc., translated by Saint Jerome; yet it is an important divergence from those source texts in its own right, and there are many <a href="#Version">Versions</a> of the Vulgate, so it may be both a Text, not an Edition, and a Translation at once.</p>
+</blockquote>
+<p><a id="translator"></a></p>
+<h3>Translator</h3>
+<blockquote>
+<p>A Translator is any person who translates a <a href="#text">Text</a> from one language to another.</p>
+</blockquote>
+<p><a id="commentary"></a></p>
+<h3>Commentary</h3>
+<blockquote>
+<p>A Commentary is a <a href="#text">Text</a> which is concerned in whole or in part with commentary on or critique of another Text.</p>
+<p>For example, the <em>Cath Maige Tuired</em> of Irish mythology is a <a href="https://uisneac.com/leabharlann/info/index.html?id=6b8fab4d-3722-4b49-80fb-a0a9c014da31">Text</a>, and the <a href="#article">Article</a> by <a href="https://uisneac.com/leabharlann/info/index.html?id=c6673cd9-c00e-4a53-a46d-800c10f2f5e9">Tomás Ó Cathasaigh</a> called <a href="https://uisneac.com/leabharlann/info/index.html?id=bb36e67e-0361-4355-bdf3-d7144af4d48f"><em>Three Notes on the Cath Maige Tuired</em></a> is a Text and a Commentary on another Text.</p>
+</blockquote>
+<p><a id="journal"></a></p>
+<h3>Journal</h3>
+<blockquote>
+<p>A Journal is an academic publication which periodically presents <a href="#article">Articles</a> on a given subject, contained within <a href="#issue">Issues</a>. An Issue is linked to its Journal via the <a href="#issue-of">ISSUE_OF</a> relationship.</p>
+<p>For example, <a href="https://uisneac.com/leabharlann/info/index.html?id=949c5778-ece0-4e31-ac11-0d5962021771">Revue Celtique</a> is a Journal which publishes <a href="#issue">Issues</a> such as <a href="https://uisneac.com/leabharlann/info/index.html?id=feb1dfcc-699b-487a-bace-a58dbabcdb61">Revue Celtique Tome 9</a>.</p>
+</blockquote>
+<h3>Issue</h3>
+<blockquote>
+<p>An Issue is a publication of a <a href="#journal">Journal</a> which contains the <a href="#article">Articles</a> presented by the journal. An Issue is linked to its Journal via the <a href="#issue-of">ISSUE_OF</a> relationship.</p>
+<p>For example, <a href="https://uisneac.com/leabharlann/info/index.html?id=949c5778-ece0-4e31-ac11-0d5962021771">Revue Celtique</a> is a Journal which publishes <a href="#issue">Issues</a> such as <a href="https://uisneac.com/leabharlann/info/index.html?id=feb1dfcc-699b-487a-bace-a58dbabcdb61">Revue Celtique Tome 9</a>.</p>
 </blockquote>
 <h2>Relationships</h2>
 <h2>WROTE</h2>
@@ -589,8 +619,14 @@ graph LR
 <p>Points from an <a href="#Author">Author</a> to a <a href="#Text">Text</a> or <a href="#Edition">Edition</a> that he wrote. This should also be used for the editor of a work, even if that person didn't specifically author the text itself.</p>
 </blockquote>
 <h2>PUBLISHED</h2>
+<p><a id="published-in"></a></p>
+<h2>PUBLISHED_IN</h2>
+<blockquote>
+<p>Used on a <a href="#text">Text</a> or <a href="#article">Article</a> to indicate the <a href="#journal">Journal</a>, <a href="#book">Book</a>, or other publication that the Text is published within. Should point from the Text to the Journal.</p>
+</blockquote>
 <h2>TRANSLATED</h2>
 <h2>VERSION_OF</h2>
+<h2>ISSUE_OF</h2>
 </section>
   </body>
 </html>
