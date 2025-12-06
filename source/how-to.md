@@ -118,9 +118,9 @@ A list of all currently used labels and when / how to use each:
 
 <a id="version"></a>
 ### Version
-> A Version represents a major variant of a [Text](#text). A single Version implies the existence of other Versions from which it deviates. A Version should not also be a Text.
+> A Version represents a major variant of a [Text](#text). Whereas an [Edition](#edition) represents a variation in the form of a work, how it appears, a Version represent a variation in content. A single Version implies the existence of other Versions from which it deviates. A Version should not also be a Text.
 >
-> For example, the [Táin Bó Cúailnge](https://uisneac.com/leabharlann/info/index.html?id=086bc4d3-d5a0-4db6-aeca-2bf91eda6bea) is a Text which is known to us from multiple manuscript editions which differ in content, so we represent each recension as a different Version, e.g. [Táin Bó Cúailnge (Recension II)](https://uisneac.com/leabharlann/info/index.html?id=4e9e7e5c-3cd1-452c-8903-e6b73f68fd59)
+> For example, the [Táin Bó Cúailnge](https://uisneac.com/leabharlann/info/index.html?id=086bc4d3-d5a0-4db6-aeca-2bf91eda6bea) is a Text which is known to us from multiple manuscript editions which differ in content, so we represent each recension as a different Version, e.g. [Táin Bó Cúailnge (Recension II)](https://uisneac.com/leabharlann/info/index.html?id=4e9e7e5c-3cd1-452c-8903-e6b73f68fd59). They are linked with the [VERSION_OF](#version-of) relationship.
 
 <a id="publisher"></a>
 ### Publisher
@@ -155,19 +155,23 @@ A list of all currently used labels and when / how to use each:
 
 ## Relationships
 
-## WROTE
+### WROTE
 > Points from an [Author](#Author) to a [Text](#Text) or [Edition](#Edition) that he wrote. This should also be used for the editor of a work, even if that person didn't specifically author the text itself.
 
-## PUBLISHED
+### PUBLISHED
 
 <a id="published-in"></a>
-## PUBLISHED_IN
-> Used on a [Text](#text) or [Article](#article) to indicate the [Journal](#journal), [Book](#book), or other publication that the Text is published within. Should point from the Text to the Journal.
+### PUBLISHED_IN
+> Used on a [Text](#text) or [Article](#article) to indicate the Journal [Issue](#issue), [Book](#book), or other publication that the Text is published within. Should point from the Text to the Journal.
 
-## TRANSLATED
+### TRANSLATED
 
-## VERSION_OF
+<a id="version-of"></a>
+### VERSION_OF
+> Used to link a [Version](#version) to the [Text](#text) that it is a version of.
 
-## ISSUE_OF
+<a id="issue-of"></a>
+### ISSUE_OF
+> Used on an [Issue](#issue) to indicate the [Journal](#journal) or other publication to which the Issue belongs. Should always point from the Issue to a Journal.
 
 </section>
