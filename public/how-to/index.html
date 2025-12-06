@@ -577,8 +577,8 @@ graph LR
 <p><a id="version"></a></p>
 <h3>Version</h3>
 <blockquote>
-<p>A Version represents a major variant of a <a href="#text">Text</a>. A single Version implies the existence of other Versions from which it deviates. A Version should not also be a Text.</p>
-<p>For example, the <a href="https://uisneac.com/leabharlann/info/index.html?id=086bc4d3-d5a0-4db6-aeca-2bf91eda6bea">Táin Bó Cúailnge</a> is a Text which is known to us from multiple manuscript editions which differ in content, so we represent each recension as a different Version, e.g. <a href="https://uisneac.com/leabharlann/info/index.html?id=4e9e7e5c-3cd1-452c-8903-e6b73f68fd59">Táin Bó Cúailnge (Recension II)</a></p>
+<p>A Version represents a major variant of a <a href="#text">Text</a>. Whereas an <a href="#edition">Edition</a> represents a variation in the form of a work, how it appears, a Version represent a variation in content. A single Version implies the existence of other Versions from which it deviates. A Version should not also be a Text.</p>
+<p>For example, the <a href="https://uisneac.com/leabharlann/info/index.html?id=086bc4d3-d5a0-4db6-aeca-2bf91eda6bea">Táin Bó Cúailnge</a> is a Text which is known to us from multiple manuscript editions which differ in content, so we represent each recension as a different Version, e.g. <a href="https://uisneac.com/leabharlann/info/index.html?id=4e9e7e5c-3cd1-452c-8903-e6b73f68fd59">Táin Bó Cúailnge (Recension II)</a>. They are linked with the <a href="#version-of">VERSION_OF</a> relationship.</p>
 </blockquote>
 <p><a id="publisher"></a></p>
 <h3>Publisher</h3>
@@ -614,19 +614,27 @@ graph LR
 <p>For example, <a href="https://uisneac.com/leabharlann/info/index.html?id=949c5778-ece0-4e31-ac11-0d5962021771">Revue Celtique</a> is a Journal which publishes <a href="#issue">Issues</a> such as <a href="https://uisneac.com/leabharlann/info/index.html?id=feb1dfcc-699b-487a-bace-a58dbabcdb61">Revue Celtique Tome 9</a>.</p>
 </blockquote>
 <h2>Relationships</h2>
-<h2>WROTE</h2>
+<h3>WROTE</h3>
 <blockquote>
 <p>Points from an <a href="#Author">Author</a> to a <a href="#Text">Text</a> or <a href="#Edition">Edition</a> that he wrote. This should also be used for the editor of a work, even if that person didn't specifically author the text itself.</p>
 </blockquote>
-<h2>PUBLISHED</h2>
+<h3>PUBLISHED</h3>
 <p><a id="published-in"></a></p>
-<h2>PUBLISHED_IN</h2>
+<h3>PUBLISHED_IN</h3>
 <blockquote>
-<p>Used on a <a href="#text">Text</a> or <a href="#article">Article</a> to indicate the <a href="#journal">Journal</a>, <a href="#book">Book</a>, or other publication that the Text is published within. Should point from the Text to the Journal.</p>
+<p>Used on a <a href="#text">Text</a> or <a href="#article">Article</a> to indicate the Journal <a href="#issue">Issue</a>, <a href="#book">Book</a>, or other publication that the Text is published within. Should point from the Text to the Journal.</p>
 </blockquote>
-<h2>TRANSLATED</h2>
-<h2>VERSION_OF</h2>
-<h2>ISSUE_OF</h2>
+<h3>TRANSLATED</h3>
+<p><a id="version-of"></a></p>
+<h3>VERSION_OF</h3>
+<blockquote>
+<p>Used to link a <a href="#version">Version</a> to the <a href="#text">Text</a> that it is a version of.</p>
+</blockquote>
+<p><a id="issue-of"></a></p>
+<h3>ISSUE_OF</h3>
+<blockquote>
+<p>Used on an <a href="#issue">Issue</a> to indicate the <a href="#journal">Journal</a> or other publication to which the Issue belongs. Should always point from the Issue to a Journal.</p>
+</blockquote>
 </section>
   </body>
 </html>
