@@ -83,7 +83,7 @@ function requireAdmin(req, res, next) {
 
 // --- Custom String Sanitization Middleware ---
 const SANITIZATION_REGEX = /[^\p{L}\p{N}\p{P}\p{Z}\s]/gu; // Allow Unicode letters (e.g., Gaelic á), numbers, punctuation, spaces; block others
-const CYPHER_KEYWORDS = ['MATCH', 'DELETE', 'MERGE', 'REMOVE', 'RETURN', 'UNWIND', 'CALL', '--', '/*']; // Potential injection indicators
+const CYPHER_KEYWORDS = ['MATCH', 'DELETE', 'MERGE', 'REMOVE', 'RETURN', 'UNWIND', '--', '/*']; // Potential injection indicators
 
 function sanitizeString(value) {
   if (typeof value === 'string') {
