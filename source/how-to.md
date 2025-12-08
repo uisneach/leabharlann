@@ -108,11 +108,11 @@ A list of all currently used labels and when / how to use each:
 >
 > The Text is an umbrella category under which are organized all other nodes related to that Text.
 >
-> Works that count as commentary on another text are [Commentaries](#commentary) and also [Texts](#text) themselves, and can also be [Articles](#article).
+> Works that count as commentary on another text are [Commentaries](#commentary) and also [Texts](#text) themselves, and can also be [Articles](#article). If there exists only one Edition of a Text, then "Text" and "Edition" can be applied to the same node.
 
 <a id="edition"></a>
 ### Edition
-> A printed or published instantiation of a [Text](#text), which appears on its own as a standalone book or article, or is published in a journal, or is contained in an anthology.
+> A printed or published instantiation of a [Text](#text), which appears on its own as a standalone book or article, or is published in a journal, or is contained in an anthology. If, however, there exists only one Edition of a Text, then "Text" and "Edition" can be applied to the same node.
 >
 >A book like *The Lord of the Rings: Return of the King* is a Text, and all the many printings and reprintings of that book are its **Editions**; but at the same time, a Text like the *Bretha Déin Chécht* was published in *Ériu* Vol. XX, along with a new translation, and both the original text and translation count as **Editions** of the original Text. 
 
@@ -157,6 +157,10 @@ A list of all currently used labels and when / how to use each:
 
 ### WROTE
 > Points from an [Author](#Author) to a [Text](#Text) or [Edition](#Edition) that he wrote. This should also be used for the editor of a work, even if that person didn't specifically author the text itself.
+
+<a id="editor"></a>
+### EDITED
+> Used between an Editor and the Edition he has edited. The person doing the editing is classed as an [Author](#author), but the act of editing is differentiated as any non-creative compilation, rearrangement, or reprinting.
 
 ### PUBLISHED
 
