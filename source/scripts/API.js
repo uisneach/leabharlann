@@ -154,10 +154,12 @@ async function createNode(labels, rawProperties) {
         if (existing.length > 0) {
           const volume = rawProperties.volume || '';
           if (volume) {
+            const isNumeric = /^\d+$/.test(volume);
+            const formattedVolume = isNumeric ? `Vol. ${volume}` : volume;
             if (secondaryValue) {
-              display_name = `${primaryValue} (${secondaryValue}) (${volume})`;
+              display_name = `${primaryValue} (${secondaryValue}) (${formattedVolume})`;
             } else {
-              display_name = `${primaryValue} (${volume})`;
+              display_name = `${primaryValue} (${formattedVolume})`;
             }
           }
         }
