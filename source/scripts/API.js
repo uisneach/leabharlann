@@ -108,7 +108,7 @@ async function refresh(refreshToken) {
   return apiRequest('POST', '/refresh', { refreshToken });
 }
 
-// Create a new node
+// Create new node
 const displayNameConfig = {
   Text: {
     primary: ['title', 'name'], // Try title first, then name
@@ -123,6 +123,7 @@ const displayNameConfig = {
     secondary: ['volume', 'issue', 'number']
   }
 };
+
 async function createNode(labels, rawProperties) {
   // Generate display_name for applicable labels
   const properties = { ...rawProperties };
@@ -134,9 +135,32 @@ async function createNode(labels, rawProperties) {
     if (primaryProp && rawProperties[primaryProp]) {
       const primaryValue = rawProperties[primaryProp];
       const secondaryValue = rawProperties[secondaryProp] || '';
-      properties.display_name = secondaryValue
+      let display_name = secondaryValue
         ? `${primaryValue} (${secondaryValue})`
         : primaryValue;
+
+      // Special handling for Edition to check for duplicates and append volume if needed
+      if (applicableLabel === 'Edition') {
+        const filter = {
+          [primaryProp]: primaryValue
+        };
+        if (secondaryValue) {
+          filter[secondaryProp] = secondaryValue;
+        }
+        const existing = await apiRequest('GET', '/nodes', { labels: ['Edition'], filter });
+        if (existing.length > 0) {
+          const volume = rawProperties.volume || '';
+          if (volume) {
+            if (secondaryValue) {
+              display_name = `${primaryValue} (${secondaryValue}) (${volume})`;
+            } else {
+              display_name = `${primaryValue} (${volume})`;
+            }
+          }
+        }
+      }
+
+      properties.display_name = display_name;
     }
   }
   return apiRequest('POST', '/nodes', { labels, properties });
