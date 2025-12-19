@@ -123,7 +123,6 @@ const displayNameConfig = {
     secondary: ['volume', 'issue', 'number']
   }
 };
-
 async function createNode(labels, rawProperties) {
   // Generate display_name for applicable labels
   const properties = { ...rawProperties };
@@ -141,13 +140,17 @@ async function createNode(labels, rawProperties) {
 
       // Special handling for Edition to check for duplicates and append volume if needed
       if (applicableLabel === 'Edition') {
-        const filter = {
-          [primaryProp]: primaryValue
-        };
-        if (secondaryValue) {
-          filter[secondaryProp] = secondaryValue;
+        let queryParams = new URLSearchParams();
+        queryParams.append('label', 'Edition');
+        if (primaryValue) {
+          queryParams.append(primaryProp, primaryValue);
         }
-        const existing = await apiRequest('GET', '/nodes', { labels: ['Edition'], filter });
+        if (secondaryValue) {
+          queryParams.append(secondaryProp, secondaryValue);
+        }
+        const path = `/nodes?${queryParams.toString()}`;
+        const response = await apiRequest('GET', path);
+        const existing = await response.json();
         if (existing.length > 0) {
           const volume = rawProperties.volume || '';
           if (volume) {
